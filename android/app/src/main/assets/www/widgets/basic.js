@@ -1,5 +1,6 @@
 import { $, API, D, LEVEL_COLOR, LOCALE, MEDIA_HTML, METRICS, Q_STYLE, S_ORDER, ago, api, averageColor, buzz, cfg, chart, color, cssVar, currentProcessesSort, emit, fillIcon, fmtClock, fmtDur, fmtHM, fmtMem, fmtReset, fmtTime, fmtValue, gotoProcesses, gpuMem, gpusOf, h, haptic, hasProcessesPage, hist, hour12, keyButton, levelOf, media, metricText, online, openSheet, paceInfo, pad, prRow, pushView, quotaProviders, r1, registerProcessesSorter, renderStatus, ringSvg, setArtColor, setMediaState, setVolDragging, shortDur, shortGpu, store, t, tick, toast, volDragging, wxBlock, wxIcon } from '../main.js';
 import { W } from '../registry.js';
+import { glyph, icon } from '../icons.js';
 import { invalidateDeckState } from './controls.js';
 
 function bindProcessLink(box, sortTarget) {
@@ -75,9 +76,9 @@ W.forecast = {
           for (let i = 0; i < Math.min(n, d.time.length); i++) {
             const day = i === 0 ? t('time.today') : new Date(d.time[i] + 'T12:00').toLocaleDateString(LOCALE, { weekday: 'short' });
             const rain = d.precipitation_probability_max?.[i];
-            cells.push(h('div', 'fc-i', h('span', 'fc-t', day), h('span', 'fc-ic', wxIcon(d.weather_code[i])),
+            cells.push(h('div', 'fc-i', h('span', 'fc-t', day), h('span', 'fc-ic', icon(wxIcon(d.weather_code[i]))),
               h('span', 'fc-v', Math.round(d.temperature_2m_max[i]) + '°', h('small', null, ' ' + Math.round(d.temperature_2m_min[i]) + '°')),
-              h('span', 'fc-r', rain >= 20 ? `💧${rain}%` : '')));
+              h('span', 'fc-r', rain >= 20 ? [icon('drop'), rain + '%'] : '')));
           }
         } else {
           const hr = w.hourly;
@@ -88,8 +89,8 @@ W.forecast = {
             const i = start + k * step;
             if (i >= hr.time.length) break;
             const rain = hr.precipitation_probability?.[i];
-            cells.push(h('div', 'fc-i', h('span', 'fc-t', k === 0 ? 'Now' : hr.time[i].slice(11, 13)), h('span', 'fc-ic', wxIcon(hr.weather_code[i], hr.is_day?.[i])),
-              h('span', 'fc-v', Math.round(hr.temperature_2m[i]) + '°'), h('span', 'fc-r', rain >= 20 ? `💧${rain}%` : '')));
+            cells.push(h('div', 'fc-i', h('span', 'fc-t', k === 0 ? 'Now' : hr.time[i].slice(11, 13)), h('span', 'fc-ic', icon(wxIcon(hr.weather_code[i], hr.is_day?.[i]))),
+              h('span', 'fc-v', Math.round(hr.temperature_2m[i]) + '°'), h('span', 'fc-r', rain >= 20 ? [icon('drop'), rain + '%'] : '')));
           }
         }
         row.replaceChildren(...cells);
@@ -250,7 +251,7 @@ W.gauge = {
         if (!s) return;
         const raw = m.pct ? m.pct(s) : m.val(s);
         const p = raw == null ? 0 : (raw / (m.pct ? 100 : m.max(s))) * 100;
-        const warn = m.hot ? (raw > m.hot[1] ? '#ef4444' : raw > m.hot[0] ? '#f59e0b' : '') : (p >= 95 ? '#ef4444' : p >= 85 ? '#f59e0b' : '');
+        const warn = m.hot ? (raw > m.hot[1] ? '#f0604d' : raw > m.hot[0] ? '#f2c94c' : '') : (p >= 95 ? '#f0604d' : p >= 85 ? '#f2c94c' : '');
         dial.style.setProperty('--qc', warn || 'var(--q)');
         if (svg) svg.remove();
         dial.insertAdjacentHTML('afterbegin', ringSvg(p));
@@ -327,10 +328,10 @@ W.meters = {
         const gpus = gpusOf(D.state);
         for (const g of gpus) {
           const m = gpuMem(g);
-          if (m) rows.push(meter(gpus.length > 1 ? `${m.label === 'VRAM' ? 'VRAM' : 'GPU'} · ${shortGpu(g.name)}` : m.label === 'VRAM' ? 'VRAM' : 'GPU MEMORY',
+          if (m) rows.push(meter(gpus.length > 1 ? `${m.label === 'VRAM' ? 'VRAM' : 'GPU'} · ${shortGpu(g.name)}` : m.label === 'VRAM' ? 'VRAM' : 'GPU memory',
             `${r1(m.used)} / ${Math.round(m.total)} GB`, (m.used / m.total) * 100, cssVar('--gpu')));
         }
-        const disks = h('div', 'disks', ...(pc.disks || []).map((dk) => meter(dk.name === '/' ? 'DISK' : dk.name, Math.round((dk.usedGb / dk.totalGb) * 100) + '%', (dk.usedGb / dk.totalGb) * 100, '#94a3b8')));
+        const disks = h('div', 'disks', ...(pc.disks || []).map((dk) => meter(dk.name === '/' ? 'Disk' : dk.name, Math.round((dk.usedGb / dk.totalGb) * 100) + '%', (dk.usedGb / dk.totalGb) * 100, '#cfcbc2')));
         list.replaceChildren(...rows, disks);
       },
     };
@@ -399,13 +400,13 @@ W.quotas = {
 
     const renderOverviewCard = (ov, flexVal) => {
       const card = h('div', 'q-card q-overview-card');
-      card.style.setProperty('--q', '#f97316');
+      card.style.setProperty('--q', '#ef8b6a');
       card.style.flex = flexVal;
       const days = ov.windowDays || 30;
       const age = ov.updatedAt ? Math.max(0, Date.now() - ov.updatedAt) : null;
       const updStr = age != null ? `checked ${age < 60_000 ? 'just now' : fmtDur(age) + ' ago'}` : '';
       card.appendChild(h('div', 'q-head',
-        h('span', 'q-logo', '📊'),
+        h('span', 'q-logo', icon('chart-bar')),
         h('span', 'q-name', 'Overview'),
         h('span', 'q-plan', `${days}-day spend`),
         updStr ? h('span', 'q-upd', updStr) : null
@@ -458,7 +459,7 @@ W.quotas = {
           grid.appendChild(renderOverviewCard(p.overview, needsPaging && ps === 2 ? '1 1 0' : '1.5'));
           continue;
         }
-        const st = Q_STYLE[p.id] || { color: '#94a3b8', logo: '●' };
+        const st = Q_STYLE[p.id] || { color: '#8f9094', logo: '●' };
         const card = h('div', 'q-card' + (p.limits.length >= 4 ? ' q-card-compact' : ''));
         card.style.setProperty('--q', st.color);
         card.style.flex = needsPaging && ps === 2 ? '1 1 0' : String(Math.max(1, p.limits.length) + 0.3);
@@ -473,8 +474,8 @@ W.quotas = {
             dial.style.width = '86px';
             dial.style.height = '86px';
           }
-          if (l.percent >= 95 || l.severity === 'critical') dial.style.setProperty('--qc', '#ef4444');
-          else if (l.percent >= 80 || l.severity === 'warning') dial.style.setProperty('--qc', '#f59e0b');
+          if (l.percent >= 95 || l.severity === 'critical') dial.style.setProperty('--qc', '#f0604d');
+          else if (l.percent >= 80 || l.severity === 'warning') dial.style.setProperty('--qc', '#f2c94c');
           dial.innerHTML = ringSvg(l.percent, pace?.elapsed); // numbers only
           const pctEl = h('div', 'q-pct', String(Math.round(l.percent)), h('small', null, '%'));
           if (compact) pctEl.style.fontSize = 'calc(22px * var(--widget-font-scale, 1))';
@@ -647,7 +648,7 @@ W.github = {
         if (!g) return;
         const rows = Math.max(1, Math.floor((box.clientHeight - 90) / 25));
         user.textContent = g.user ? '@' + g.user : '';
-        bell.textContent = `🔔 ${g.notifications >= 50 ? '50+' : g.notifications}`;
+        bell.replaceChildren(icon('bell'), ` ${g.notifications >= 50 ? '50+' : g.notifications}`);
         rc.textContent = g.reviewRequests.length;
         mc.textContent = g.myPrs.length;
         const nRev = Math.min(g.reviewRequests.length || 1, Math.max(1, Math.floor(rows / 2)));
@@ -667,7 +668,7 @@ W.processes = {
     const sum = h('span', 'p-sum');
     const seg = h('div', 'seg', h('button', sort === 'cpu' ? 'on' : null, 'CPU'), h('button', sort === 'mem' ? 'on' : null, 'RAM'));
     const grid = h('div', 'p-grid', h('div', 'empty', t('w.procsWait')));
-    box.style.setProperty('--c', '#f472b6');
+    box.style.setProperty('--c', '#cfcbc2');
     box.append(h('div', 'p-head', h('span', 's-label', 'Processes'), sum, seg), grid);
     const els = new Map();
     const rowEl = (g) => {
@@ -709,7 +710,7 @@ W.processes = {
         e._g = g;
         e.querySelector('.p-t').textContent = g.title;
         e.querySelector('.p-count').textContent = g.count > 1 ? '×' + g.count : '';
-        e.querySelector('.p-lock').textContent = g.locked ? '🔒' : '';
+        e.querySelector('.p-lock').replaceChildren(g.locked ? icon('lock') : '');
         e.querySelector('.p-bar i').style.width = ((sort === 'cpu' ? g.cpu : g.memMb) / max) * 100 + '%';
         e.querySelector('.p-nums b').textContent = sort === 'cpu' ? g.cpu.toFixed(1) + '%' : fmtMem(g.memMb);
         e.querySelector('.p-nums small').textContent = sort === 'cpu' ? fmtMem(g.memMb) : g.cpu.toFixed(1) + '%';
@@ -899,7 +900,8 @@ W.pomodoro = {
     const save = () => { st.phase = plan[st.step].kind; store.set(key, st); };
     save();
     const dial = h('div', 'g-dial'), time = h('div', 'g-val'), phase = h('div', 'g-label'), count = h('div', 'g-sub');
-    const play = h('button', 'pb main', '▶'), reset = h('button', 'pb', '↺'), skip = h('button', 'pb', '⏭');
+    const play = h('button', 'pb main', icon('play')), reset = h('button', 'pb', icon('arrow-counter-clockwise')), skip = h('button', 'pb', icon('skip-forward'));
+    play.setAttribute('aria-label', 'Start or pause'); reset.setAttribute('aria-label', 'Restart'); skip.setAttribute('aria-label', 'Skip');
     dial.append(time);
     box.append(dial, phase, count, h('div', 'pomo-btns', reset, play, skip));
     let svg = null;
@@ -935,7 +937,7 @@ W.pomodoro = {
         const next = plan[st.step].kind;
         toast(finished ? 'Sequence finished, well done'
           : next === 'long' ? 'Time for a long break' : next === 'break' ? 'Time for a break'
-            : was === 'focus' ? 'Next focus session' : 'Back to focus', 'ok', '🍅 Pomodoro', 5);
+            : was === 'focus' ? 'Next focus session' : 'Back to focus', 'ok', [icon('timer'), ' Pomodoro'], 5);
       }
       const left = remaining();
       const kind = plan[st.step].kind;
@@ -947,10 +949,11 @@ W.pomodoro = {
       svg = dial.firstElementChild;
       time.textContent = fmtTime(left + 999);
       phase.textContent = label();
-      const tomatoes = st.count ? '🍅'.repeat(Math.min(st.count, 6)) + (st.count > 6 ? ` ×${st.count}` : '') : t('w.noSessionsToday');
+      const tomatoes = st.count ? '●'.repeat(Math.min(st.count, 6)) + (st.count > 6 ? ` ×${st.count}` : '') : t('w.noSessionsToday');
       count.textContent = custom.bad ? `Sequence not understood: "${custom.bad}"`
         : rounds > 1 ? `Round ${(st.round || 0) + 1}/${rounds} · ${tomatoes}` : tomatoes;
-      play.textContent = st.endsAt ? '⏸' : '▶';
+      const want = st.endsAt ? 'pause' : 'play';
+      if (play.dataset.icon !== want) { play.dataset.icon = want; play.replaceChildren(icon(want)); }
     };
     play.addEventListener('click', () => {
       haptic();
@@ -1005,7 +1008,7 @@ W.note = {
   bare: true, needs: [],
   create(box, { o }) {
     const text = String(o.text ?? '');
-    box.style.setProperty('--n', o.color || '#fbbf24');
+    box.style.setProperty('--n', o.color || '#ece5d5');
     box.style.setProperty('--nf', text.length < 25 ? 15 : text.length < 70 ? 10.5 : text.length < 160 ? 8 : 6.5);
     box.append(h('div', 'note-t', text));
     return {};
@@ -1074,7 +1077,7 @@ W.push = {
       if (c) box.style.setProperty('--c', c); else box.style.removeProperty('--c');
       const unit = v.unit ?? o.unit ?? '';
       const style = o.style && o.style !== 'auto' ? o.style : v.items ? 'list' : 'big';
-      const title = h('div', 'w-title', (v.icon ? v.icon + ' ' : '') + (o.title || v.title || key), h('span', 'push-age w-sub', ago(item.at)));
+      const title = h('div', 'w-title', h('span', null, ...(v.icon ? [glyph(v.icon), ' '] : []), o.title || v.title || key), h('span', 'push-age w-sub', ago(item.at)));
       let body;
       if (style === 'list') {
         const items = v.items || (v.value != null ? [v.value] : []);

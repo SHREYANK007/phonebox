@@ -11,16 +11,20 @@
 .w[data-widget-border="false"] { border: 0 !important; }
 .w[data-widget-border="true"] { border: 1px solid var(--line) !important; }
 .w[data-widget-shadow="false"] { box-shadow: none !important; }
-.w[data-widget-shadow="true"] { box-shadow: 0 5px 16px rgba(0,0,0,.28) !important; }
+.w[data-widget-shadow="true"] { box-shadow: var(--well-shadow), 0 5px 16px rgba(0,0,0,.28) !important; }
 .w:is([data-widget-surface="cards"],[data-widget-surface="seamless"]) { background: var(--card); }
+/* flat: the well without its depth, a plain panel a shade lighter than the plate */
 .w[data-widget-surface="flat"] {
-  background: #15191f;
-  background: color-mix(in srgb, var(--bg) 94%, var(--text));
+  --seg: #262628;
+  background: #262628;
+  background: color-mix(in srgb, var(--plate) 92%, var(--text));
+  --seg: color-mix(in srgb, var(--plate) 92%, var(--text));
   background-image: none !important;
+  box-shadow: none;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
-.w[data-widget-surface="borderless"] { background: transparent !important; background-image: none !important; }
+.w[data-widget-surface="borderless"] { --seg: var(--plate); background: transparent !important; background-image: none !important; box-shadow: none !important; }
 /* Keep control surfaces consistent without changing signal meters or round dials. */
 .w.has-widget-radius :is(.deck-channel,.deck-button,.deck-hold,.radio-card,.chip-btn,.sc) {
   border-radius: min(var(--widget-radius), 12px);

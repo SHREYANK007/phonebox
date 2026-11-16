@@ -18,6 +18,20 @@ MIT License, Copyright (c) 2013-2025 Raffael Herrmann; Copyright (c) 2024-2025 S
 
 --------------------------------------------------------------------------------
 
+Mona Sans (panel typeface, www/mona-sans.woff2 and www/mona-sans-ext.woff2, unmodified Google Fonts builds)
+https://github.com/github/mona-sans
+SIL Open Font License 1.1, Copyright 2022 The Mona Sans Project Authors, with Reserved Font Name "Mona"
+The full license is shipped beside the font files as www/mona-sans-LICENSE.txt.
+
+--------------------------------------------------------------------------------
+
+Phosphor Icons 2.1.1 (panel icons, the regular-weight paths in www/icons.js)
+https://github.com/phosphor-icons/core
+MIT License, Copyright (c) 2023 Phosphor Icons
+The full license is shipped beside the icons as www/icons-LICENSE.txt.
+
+--------------------------------------------------------------------------------
+
 NAudio 3.3.0 (Windows build)
 https://github.com/naudio/NAudio
 MIT License

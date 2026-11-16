@@ -345,7 +345,7 @@ test('the Computers widget lists paired computers and switches between them', as
   await layout(page, [widget('pcswitch')]);
 
   const pcs = page.locator('.w-pcswitch .ov-pc');
-  await expect(pcs).toHaveText(['🖥️ Desk PC', '🖥️ MacBook']);
+  await expect(pcs).toHaveText(['Desk PC', 'MacBook']);
   await expect(pcs.nth(0)).toHaveClass(/\bon\b/);
   await pcs.nth(0).click();
   await pcs.nth(1).click();

@@ -1,5 +1,6 @@
 import { $, LOCALE, buzz, fmtTime, h, haptic, pad, r1, store, t, tick, toast } from '../main.js';
 import { W } from '../registry.js';
+import { icon } from '../icons.js';
 import { dialEl, lines } from './helpers.js';
 
 // ---------------------------------------------------------------- clocks & time
@@ -67,12 +68,16 @@ W.stopwatch = {
     let st = store.get(key, null) || { start: null, acc: 0, laps: [] };
     const save = () => store.set(key, st);
     const t = h('div', 'sw-t'), laps = h('div', 'sw-laps');
-    const a = h('button', 'pb main', '▶'), b = h('button', 'pb', '↺');
+    const a = h('button', 'pb main', icon('play')), b = h('button', 'pb', icon('arrow-counter-clockwise'));
     box.append(h('div', 'w-title', 'Stopwatch'), t, h('div', 'pomo-btns', b, a), laps);
     const elapsed = () => st.acc + (st.start ? Date.now() - st.start : 0);
     const fmtSw = (ms) => { const s = Math.floor(ms / 1000); const hh = Math.floor(s / 3600); return (hh ? hh + ':' + pad(Math.floor((s % 3600) / 60)) : Math.floor(s / 60)) + ':' + pad(s % 60) + '.' + Math.floor((ms % 1000) / 100); };
     const renderLaps = () => laps.replaceChildren(...st.laps.slice(-6).reverse().map((l, i, arr) => h('div', 'sw-lap', h('span', null, '#' + (st.laps.length - i)), h('span', null, fmtSw(l)))));
-    const paint = () => { a.textContent = st.start ? '⏸' : '▶'; b.textContent = st.start ? '⚑' : '↺'; box.classList.toggle('run', !!st.start); };
+    const paint = () => {
+      a.replaceChildren(icon(st.start ? 'pause' : 'play')); b.replaceChildren(icon(st.start ? 'flag' : 'arrow-counter-clockwise'));
+      a.setAttribute('aria-label', st.start ? 'Pause' : 'Start'); b.setAttribute('aria-label', st.start ? 'Lap' : 'Reset');
+      box.classList.toggle('run', !!st.start);
+    };
     a.addEventListener('click', () => { haptic(); if (st.start) { st.acc = elapsed(); st.start = null; } else st.start = Date.now(); save(); paint(); });
     b.addEventListener('click', () => { haptic(); if (st.start) st.laps.push(elapsed()); else st = { start: null, acc: 0, laps: [] }; save(); paint(); renderLaps(); });
     paint(); renderLaps();
@@ -90,13 +95,13 @@ W.timer = {
     const save = () => store.set(key, st);
     const dial = dialEl(), btns = h('div', 'tm-btns');
     box.append(h('div', 'w-title', o.label || 'Timer'), dial, btns);
-    box.style.setProperty('--q', o.color || '#38bdf8');
+    box.style.setProperty('--q', o.color || '#54c2d9');
     const remaining = () => (st.endsAt ? Math.max(0, st.endsAt - Date.now()) : st.left);
     const renderBtns = () => {
       if (!st.total) {
         btns.replaceChildren(...presets.map((m) => { const b = h('button', 'chip-btn', m + 'm'); b.addEventListener('click', () => { haptic(); st = { endsAt: Date.now() + m * 60000, left: m * 60000, total: m * 60000 }; save(); renderBtns(); render(); }); return b; }));
       } else {
-        const p = h('button', 'pb main', st.endsAt ? '⏸' : '▶'), x = h('button', 'pb', '✕');
+        const p = h('button', 'pb main', icon(st.endsAt ? 'pause' : 'play')), x = h('button', 'pb', icon('x'));
         p.addEventListener('click', () => { haptic(); if (st.endsAt) { st.left = remaining(); st.endsAt = null; } else st.endsAt = Date.now() + st.left; save(); renderBtns(); });
         x.addEventListener('click', () => { haptic(); st = { endsAt: null, left: 0, total: 0 }; save(); renderBtns(); render(); });
         btns.replaceChildren(x, p);
@@ -106,7 +111,7 @@ W.timer = {
       if (st.endsAt && remaining() <= 0) {
         st = { endsAt: null, left: 0, total: 0 }; save(); renderBtns();
         buzz('0,300,150,300,150,600');
-        toast('Time is up', 'ok', '⏳ ' + (o.label || 'Timer'), 6);
+        toast('Time is up', 'ok', [icon('hourglass-medium'), ' ' + (o.label || 'Timer')], 6);
       }
       const left = remaining();
       dial.set(st.total ? 100 * (left / st.total) : 0, st.total ? fmtTime(left + 999) : '—');
@@ -124,7 +129,7 @@ W.counter = {
     let st = store.get(key, null) || { n: 0, day: new Date().toDateString() };
     const step = Number(o.step) || 1;
     const num = h('div', 'ct-n'), minus = h('button', 'pb', '−'), plus = h('button', 'pb main', '+'), reset = h('button', 'mini-btn', 'Reset');
-    box.style.setProperty('--q', o.color || '#a78bfa');
+    box.style.setProperty('--q', o.color || '#6f9bff');
     box.append(h('div', 'w-title', o.label || 'Counter', reset), num, h('div', 'pomo-btns', minus, plus));
     // "Start from zero every day" also when the panel stays open over midnight (it is never rebuilt then)
     const fresh = () => { const today = new Date().toDateString(); if (o.daily !== false && st.day !== today) { st = { n: 0, day: today }; num.textContent = st.n; } };

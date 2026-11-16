@@ -1,5 +1,6 @@
 import { $, D, DEFAULT_CFG, LOCALE, cfg, fmtDur, fmtHM, h, t, tick } from '../main.js';
 import { W } from '../registry.js';
+import { icon } from '../icons.js';
 import { cached, every } from './helpers.js';
 
 // ---------------------------------------------------------------- sky & air
@@ -42,7 +43,7 @@ W.sun = {
         q('.sl').textContent = now < rise ? t('w.risesIn', { dur: fmtDur(rise - now) }) : now > set ? t('w.afterSunset') : t('w.lightLeft', { dur: fmtDur(set - now) });
         q('.w-sub').textContent = t('w.day') + ' ' + fmtDur((d.daylight_duration?.[0] ?? (set - rise) / 1000) * 1000) + (d.uv_index_max?.[0] != null ? ` · UV ${Math.round(d.uv_index_max[0])}` : '');
         const m = moonPhase(now);
-        q('.moon').textContent = `${m.icon} ${m.name} · ${Math.round(m.illum * 100)}%`;
+        q('.moon').replaceChildren(icon('moon'), ` ${m.name} · ${Math.round(m.illum * 100)}%`);
       },
     };
   },

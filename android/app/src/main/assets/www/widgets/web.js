@@ -50,7 +50,7 @@ W.exchange = {
           const last = series[series.length - 1], prev = series.length > 1 ? series[series.length - 2] : last;
           const c = h('canvas', 'fx-sp');
           const row = h('div', 'fx-i', h('b', null, s), h('span', 'fx-v', fmtNum(last)), pctSpan(((last - prev) / prev) * 100), c);
-          requestAnimationFrame(() => sparkLine(c, series, last >= series[0] ? '#22c55e' : '#ef4444'));
+          requestAnimationFrame(() => sparkLine(c, series, last >= series[0] ? '#4cc38a' : '#f0604d'));
           return row;
         }));
       } catch (_) { list.replaceChildren(h('div', 'empty', t('w.ratesUnavailable'))); return false; }
@@ -72,7 +72,7 @@ W.crypto = {
         list.replaceChildren(...d.map((c) => {
           const cv = h('canvas', 'fx-sp');
           const series = c.sparkline_in_7d?.price || [];
-          requestAnimationFrame(() => sparkLine(cv, series, (c.price_change_percentage_24h ?? 0) >= 0 ? '#22c55e' : '#ef4444'));
+          requestAnimationFrame(() => sparkLine(cv, series, (c.price_change_percentage_24h ?? 0) >= 0 ? '#4cc38a' : '#f0604d'));
           return h('div', 'fx-i', h('b', null, (c.symbol || '').toUpperCase()), h('span', 'fx-v', fmtNum(c.current_price)), pctSpan(c.price_change_percentage_24h ?? 0), cv);
         }));
       } catch (_) { list.replaceChildren(h('div', 'empty', t('w.pricesUnavailable'))); return false; }

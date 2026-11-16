@@ -1,5 +1,6 @@
 import { $, API, D, PANEL_HEADERS, LOCALE, Q_STYLE, api, bridge, cfg, color, cssVar, rulesPaused, toggleRulesPause, fillIcon, fmtDur, fmtHM, fmtMem, gotoPageRef, gpuMem, gpusOf, h, haptic, openSheet, paceInfo, pad, pairedPcs, quotaProviders, r1, shortGpu, store, switchPc, t, tick, toast, transport } from '../main.js';
 import { W } from '../registry.js';
+import { icon } from '../icons.js';
 import { canKillAnywhere, dialEl, every } from './helpers.js';
 
 // ---------------------------------------------------------------- phone & PC
@@ -7,7 +8,7 @@ import { canKillAnywhere, dialEl, every } from './helpers.js';
 // the panel's data through window.phonebox: phonebox.on('state' | 'push' | 'weather' | 'work' | 'quotas', fn),
 // phonebox.data, and may ask for phonebox.run(shortcutId) or phonebox.goto(page).
 export const HTML_PRELUDE = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="dark"><style>:root{color-scheme:dark}html,body{margin:0;height:100%;background:transparent;color:#eef2f6;font-family:Roboto,"Segoe UI",system-ui,sans-serif;overflow:hidden}</style>
+<meta name="color-scheme" content="dark"><style>:root{color-scheme:dark}html,body{margin:0;height:100%;background:transparent;color:#eeebe3;font-family:Roboto,"Segoe UI",system-ui,sans-serif;overflow:hidden}</style>
 <script>(function(){var subs={},data={};window.phonebox={data:data,
 on:function(k,f){(subs[k]=subs[k]||[]).push(f);if(data[k]!==undefined)try{f(data[k])}catch(e){console.error(e)}},
 run:function(id){parent.postMessage({phonebox:'run',id:String(id)},'*')},
@@ -40,7 +41,7 @@ W.html = {
 };
 
 // Battery levels of the PC's wireless devices (agent: BatteryMonitor) and, optionally, the panel phone itself.
-export const BAT_ICONS = { headphones: '🎧', mouse: '🖱️', keyboard: '⌨️', controller: '🎮', laptop: '💻', pen: '🖊️', phone: '📱', other: '🔋' };
+export const BAT_ICONS = { headphones: 'headphones', mouse: 'mouse', keyboard: 'keyboard', controller: 'game-controller', laptop: 'laptop', pen: 'pen', phone: 'device-mobile', other: 'battery-full' };
 W.batteries = {
   needs: ['tick'],
   create(box, { o }) {
@@ -60,12 +61,12 @@ W.batteries = {
       if (!data && !devices.length) { list.replaceChildren(h('div', 'empty', t('w.loading'))); return; }
       if (!devices.length) { list.replaceChildren(h('div', 'empty', 'No wireless devices report a battery level')); return; }
       list.replaceChildren(...devices.map((d) => {
-        const col = d.level <= low ? '#ef4444' : d.level <= low * 2 ? '#f59e0b' : '#22c55e';
+        const col = d.level <= low ? '#f0604d' : d.level <= low * 2 ? '#f2c94c' : '#4cc38a';
         const row = h('div', 'bt-row' + (d.level <= low ? ' low' : ''),
-          h('span', 'bt-ico', BAT_ICONS[d.kind] || '🔋'),
+          h('span', 'bt-ico', icon(BAT_ICONS[d.kind] || 'battery-full')),
           h('span', 'bt-name', d.name),
           h('span', 'bt-bar', h('i')),
-          h('b', 'bt-pct', (d.charging ? '⚡' : '') + d.level + '%'));
+          h('b', 'bt-pct', d.charging ? icon('lightning') : null, d.level + '%'));
         row.style.setProperty('--c', col);
         row.style.setProperty('--v', d.level / 100);
         return row;
@@ -111,7 +112,7 @@ W.obs = {
       const kids = [
         h('div', 'obs-top', pill(s.streaming, 'LIVE', 'live', s.streamMs, 'stream'), pill(s.recording, recLabel, 'rec', s.recordPaused ? s.recordMs - since : s.recordMs, 'record')),
         h('div', 'obs-scene', h('span', null, 'Scene'), h('b', null, s.scene || '—'),
-          s.micMuted != null ? h('span', 'obs-mic' + (s.micMuted ? ' muted' : ''), s.micMuted ? '🔇' : '🎙️') : null),
+          s.micMuted != null ? h('span', 'obs-mic' + (s.micMuted ? ' muted' : ''), icon(s.micMuted ? 'microphone-slash' : 'microphone')) : null),
       ];
       if (o.scenes !== false && s.scenes.length) {
         kids.push(h('div', 'obs-scenes', ...s.scenes.map((name) => {
@@ -172,10 +173,10 @@ W.discord = {
       const kids = [h('div', 'dc-top',
         h('span', 'dc-where', s.channelName ? `${s.channelName}` : t('w.discord.notInChannel')),
         s.channelKind ? h('span', 'dc-kind', s.channelKind) : null,
-        btn('mute', s.muted ? '🔇' : '🎙️', s.muted, 'mute'), btn('deaf', s.deafened ? '🔕' : '🎧', s.deafened, 'deafen'),
-        s.channelId ? btn('leave', '📞', false, 'leave') : null)];
+        btn('mute', icon(s.muted ? 'microphone-slash' : 'microphone'), s.muted, 'mute'), btn('deaf', icon(s.deafened ? 'ear-slash' : 'headphones'), s.deafened, 'deafen'),
+        s.channelId ? btn('leave', icon('phone-x'), false, 'leave') : null)];
       if (s.channelId && s.members.length) {
-        kids.push(h('div', 'dc-members', ...s.members.map((m) => h('span', 'dc-member' + (m.deafened ? ' deaf' : m.muted ? ' muted' : ''), ico(m.avatar && img('user', m.id, m.avatar), m.name), (m.deafened ? '🔕 ' : m.muted ? '🔇 ' : '') + m.name))));
+        kids.push(h('div', 'dc-members', ...s.members.map((m) => h('span', 'dc-member' + (m.deafened ? ' deaf' : m.muted ? ' muted' : ''), ico(m.avatar && img('user', m.id, m.avatar), m.name), m.deafened ? icon('ear-slash') : m.muted ? icon('microphone-slash') : null, m.name))));
       }
       if (o.channels !== false && s.channels.length) {
         // one block per server; tap it to unfold its voice channels (the server you are in starts unfolded)
@@ -201,7 +202,7 @@ W.discord = {
           const block = h('div', 'dc-block' + (isOpen ? ' open' : ''), head);
           if (isOpen) {
             block.append(h('div', 'dc-chans', ...chans.map((c) => {
-              const b = h('button', 'dc-chan' + (c.id === s.channelId ? ' cur' : '') + (busy === 'join' + c.id ? ' busy' : ''), '🔊 ' + c.name);
+              const b = h('button', 'dc-chan' + (c.id === s.channelId ? ' cur' : '') + (busy === 'join' + c.id ? ' busy' : ''), icon('speaker-high'), ' ' + c.name);
               if (ctl && !busy && c.id !== s.channelId) b.addEventListener('click', () => act('join', c.id));
               return b;
             })));
@@ -222,13 +223,13 @@ W.discord = {
 // Home Assistant entities through the agent (which holds the token). Tap a light, switch, scene… to switch it,
 // when the widget allows it.
 export const HA_ICONS = {
-  light: '💡', switch: '🔌', fan: '🌀', cover: '🪟', media_player: '🎵', scene: '🎬', script: '📜', automation: '🤖',
-  climate: '🌡️', person: '🧑', vacuum: '🧹', camera: '📷', input_boolean: '🔘', button: '🔘', input_button: '🔘', sun: '☀️', weather: '⛅',
+  light: 'lightbulb', switch: 'plug', fan: 'fan', cover: 'app-window', media_player: 'music-notes', scene: 'film-slate', script: 'scroll', automation: 'robot',
+  climate: 'thermometer', person: 'user', vacuum: 'broom', camera: 'camera', input_boolean: 'radio-button', button: 'cursor-click', input_button: 'cursor-click', sun: 'sun', weather: 'cloud-sun',
 };
 export const HA_CLASS_ICONS = {
-  temperature: '🌡️', humidity: '💧', power: '⚡', energy: '⚡', battery: '🔋', illuminance: '☀️', door: '🚪', garage_door: '🚪',
-  window: '🪟', motion: '🏃', occupancy: '🧍', presence: '🧍', moisture: '💧', smoke: '🔥', gas: '🔥', co2: '🫧', carbon_dioxide: '🫧',
-  pm25: '🌫️', connectivity: '📶', plug: '🔌', outlet: '🔌', lock: '🔒', sound: '🔊', vibration: '📳',
+  temperature: 'thermometer', humidity: 'drop', power: 'lightning', energy: 'lightning', battery: 'battery-full', illuminance: 'sun', door: 'door', garage_door: 'door',
+  window: 'app-window', motion: 'person-simple-run', occupancy: 'person', presence: 'person', moisture: 'drop', smoke: 'fire', gas: 'fire', co2: 'wind', carbon_dioxide: 'wind',
+  pm25: 'cloud-fog', connectivity: 'wifi-high', plug: 'plug', outlet: 'plug', lock: 'lock', sound: 'speaker-high', vibration: 'vibrate',
 };
 export const HA_SWITCHABLE = new Set(['light', 'switch', 'fan', 'input_boolean', 'automation', 'siren', 'humidifier', 'group', 'cover', 'media_player',
   'scene', 'script', 'button', 'input_button', 'lock', 'vacuum']);
@@ -277,13 +278,13 @@ W.ha = {
       grid.replaceChildren(...data.entities.map((e) => {
         const dom = e.id.split('.')[0];
         const active = HA_ACTIVE.has(e.state);
-        const icon = dom === 'lock' ? (e.state === 'unlocked' ? '🔓' : '🔒') : HA_CLASS_ICONS[e.deviceClass] || HA_ICONS[dom] || '◻️';
+        const iconName = dom === 'lock' ? (e.state === 'unlocked' ? 'lock-open' : 'lock') : HA_CLASS_ICONS[e.deviceClass] || HA_ICONS[dom] || 'square';
         const can = o.control === true && HA_SWITCHABLE.has(dom) && e.state !== 'unavailable';
         const tile = h('div', 'ha-tile' + (active ? ' on' : '') + (can ? ' can' : '') + (busy === e.id ? ' busy' : '') + (e.state === 'unavailable' ? ' gone' : ''),
-          h('span', 'ha-ico', icon), h('span', 'ha-name', e.name), h('b', 'ha-state', haState(e)));
+          h('span', 'ha-ico', icon(iconName)), h('span', 'ha-name', e.name), h('b', 'ha-state', haState(e)));
         if (can) tile.addEventListener('click', () => toggle(e));
         return tile;
-      }), ...(data.error ? [h('div', 'ha-err', '⚠ ' + data.error)] : []));
+      }), ...(data.error ? [h('div', 'ha-err', icon('warning'), ' ' + data.error)] : []));
     };
     const tick = every(4000, async () => { await load(); render(); });
     return { update: () => { tick(); render(); } };
@@ -339,7 +340,7 @@ W.docker = {
           b.addEventListener('click', (e) => { e.stopPropagation(); act(c, action); });
           return b;
         };
-        return h('div', 'dk-wrap', row, h('div', 'dk-acts', ...(c.state === 'running' ? [btn('↻ Restart', 'restart'), btn('■ Stop', 'stop', 'danger')] : [btn('▶ Start', 'start', 'go')])));
+        return h('div', 'dk-wrap', row, h('div', 'dk-acts', ...(c.state === 'running' ? [btn([icon('arrow-clockwise'), ' Restart'], 'restart'), btn([icon('stop'), ' Stop'], 'stop', 'danger')] : [btn([icon('play'), ' Start'], 'start', 'go')])));
       }));
     };
     const tick = every(4000, async () => { await load(); render(); });
@@ -495,7 +496,7 @@ W.agenda = {
         rows.push(row);
       }
       const body = h('div', 'ag-list', ...(rows.length ? rows : [h('div', 'empty', `Nothing in the next ${days} days`)]));
-      box.replaceChildren(h('div', 'w-title', o.title || 'Agenda', cal.errors?.length ? h('span', 'ag-err', ' ⚠') : null), body);
+      box.replaceChildren(h('div', 'w-title', o.title || 'Agenda', cal.errors?.length ? h('span', 'ag-err', ' ', icon('warning')) : null), body);
       // drop rows that do not fit, keeping the day headers tidy
       while (body.scrollHeight > body.clientHeight + 2 && body.childElementCount > 1) {
         body.lastElementChild.remove();
@@ -527,9 +528,10 @@ W.onair = {
         const on = mic || cam || obsLive || pushed;
         box.classList.toggle('on', on);
         const apps = [...new Set([...(mic ? p.micApps || [] : []), ...(cam ? p.cameraApps || [] : [])])];
-        sub.textContent = on
-          ? [mic ? '🎙️' : '', cam ? '📷' : '', obsLive ? (obs.streaming ? 'OBS live' : 'OBS recording') : '', apps.join(', ') || (pushed && typeof pv === 'string' ? pv : '')].filter(Boolean).join(' ')
-          : (src === 'mic' || src === 'camera') && p && p.mic == null ? 'Not detectable on this computer' : 'Off air';
+        const what = [obsLive ? (obs.streaming ? 'OBS live' : 'OBS recording') : '', apps.join(', ') || (pushed && typeof pv === 'string' ? pv : '')].filter(Boolean).join(' ');
+        sub.replaceChildren(...(on
+          ? [mic ? icon('microphone') : null, cam ? icon('camera') : null, (mic || cam) && what ? ' ' : '', what]
+          : [(src === 'mic' || src === 'camera') && p && p.mic == null ? 'Not detectable on this computer' : 'Off air']));
       },
     };
   },
@@ -539,14 +541,14 @@ W.battery = {
   needs: ['tick'],
   create(box) {
     const dial = dialEl(), sub = h('div', 'g-sub');
-    box.append(dial, h('div', 'g-label', 'PHONE'), sub);
+    box.append(dial, h('div', 'g-label', 'Phone'), sub);
     const load = every(20_000, () => {
       if (!bridge) { dial.set(0, '—'); sub.textContent = 'Only on the phone'; return; }
       try {
         const b = JSON.parse(bridge.battery());
-        box.style.setProperty('--q', b.plugged ? '#22c55e' : b.level <= 20 ? '#ef4444' : b.level <= 40 ? '#f59e0b' : '#84cc16');
+        box.style.setProperty('--q', b.plugged ? '#4cc38a' : b.level <= 20 ? '#f0604d' : b.level <= 40 ? '#f2c94c' : '#ece5d5');
         dial.set(b.level, b.level, '%');
-        sub.textContent = (b.plugged ? '⚡ Charging' : 'On battery') + (b.temp ? ` · ${b.temp.toFixed(0)}°C` : '');
+        sub.replaceChildren(...(b.plugged ? [icon('lightning'), ' Charging'] : ['On battery']), b.temp ? ` · ${b.temp.toFixed(0)}°C` : '');
       } catch (_) {}
     });
     return { update: load };
@@ -573,7 +575,7 @@ W.pcswitch = {
         return;
       }
       row.replaceChildren(...pcs.map((pc) => {
-        const b = h('button', 'ov-pc' + (pc.active && !usb ? ' on' : ''), '🖥️ ' + (pc.name || t('panel.computer')));
+        const b = h('button', 'ov-pc' + (pc.active && !usb ? ' on' : ''), icon('monitor'), ' ' + (pc.name || t('panel.computer')));
         b.disabled = usb;
         b.addEventListener('click', (e) => { e.stopPropagation(); switchPc(pc); });
         return b;
@@ -590,7 +592,7 @@ W.topprocs = {
   create(box, { o }) {
     const byMem = o.sort === 'mem';
     const list = h('div', 'tp-list');
-    box.style.setProperty('--c', '#f472b6');
+    box.style.setProperty('--c', '#cfcbc2');
     const title = h('div', 'w-title', byMem ? 'Top memory' : 'Top CPU');
     box.append(title, list);
     const rowMap = new Map();
@@ -633,7 +635,7 @@ W.quotaring = {
   needs: ['quotas', 'tick'],
   create(box, { o }) {
     const prov = o.provider || 'claude', idx = Number(o.limit) || 0;
-    const st = Q_STYLE[prov] || { color: '#94a3b8', logo: '●' };
+    const st = Q_STYLE[prov] || { color: '#8f9094', logo: '●' };
     box.style.setProperty('--q', st.color);
     const dial = dialEl(), label = h('div', 'g-label'), sub = h('div', 'g-sub');
     box.append(dial, label, sub);
@@ -643,7 +645,7 @@ W.quotaring = {
       const l = p?.limits?.[idx];
       if (!l) { dial.set(0, '—'); label.textContent = `${st.logo} ${p?.name || prov}`; sub.textContent = D.quotas ? 'No data' : 'Waiting…'; return; }
       const pace = paceInfo(l);
-      dial.style.setProperty('--qc', l.percent >= 95 ? '#ef4444' : l.percent >= 80 ? '#f59e0b' : 'var(--q)');
+      dial.style.setProperty('--qc', l.percent >= 95 ? '#f0604d' : l.percent >= 80 ? '#f2c94c' : 'var(--q)');
       dial.set(l.percent, Math.round(l.percent), '%', pace?.elapsed);
       label.textContent = `${st.logo} ${p.name} · ${l.label}`;
       sub.textContent = l.resetsAt ? 'resets in ' + fmtDur(l.resetsAt - Date.now()) : '';
@@ -657,7 +659,8 @@ W.volume = {
   needs: ['state'],
   create(box) {
     const fill = h('i'), bar = h('div', 'vb', fill), pct = h('div', 'vb-v', '--');
-    const mute = h('button', 'pb', '🔇'), down = h('button', 'pb', '−'), up = h('button', 'pb', '+');
+    const mute = h('button', 'pb', icon('speaker-slash')), down = h('button', 'pb', icon('minus')), up = h('button', 'pb', icon('plus'));
+    mute.setAttribute('aria-label', 'Mute'); down.setAttribute('aria-label', 'Volume down'); up.setAttribute('aria-label', 'Volume up');
     box.append(h('div', 'w-title', 'Volume'), h('div', 'vb-row', bar, pct), h('div', 'pomo-btns', mute, down, up));
     let dragging = false, timer = 0, level = 0;
     const vertical = () => box.clientHeight > box.clientWidth * 1.15;
@@ -696,9 +699,9 @@ W.volume = {
 };
 
 // The agent's automation rules: which hold right now, and a button to pause them all for an hour.
-const RULE_WHEN = { 'session-waiting': '✳️', 'session-busy': '⚙️', 'media-playing': '🎵', 'process-running': '🪟', 'mic-in-use': '🎙️', 'camera-in-use': '📷',
-  'obs-live': '🔴', 'calendar-event': '📆', 'cpu-above': '🔥', idle: '🌙', time: '🕙', push: '📡', 'quota-above': '🎯', 'review-requested': '👀',
-  'ci-failed': '❌', 'battery-low': '🔋', 'ping-high': '📶', always: '📅' };
+const RULE_WHEN = { 'session-waiting': 'asterisk', 'session-busy': 'gear', 'media-playing': 'music-notes', 'process-running': 'app-window', 'mic-in-use': 'microphone', 'camera-in-use': 'camera',
+  'obs-live': 'record', 'calendar-event': 'calendar-dots', 'cpu-above': 'fire', idle: 'moon', time: 'clock', push: 'broadcast', 'quota-above': 'target', 'review-requested': 'eye',
+  'ci-failed': 'x-circle', 'battery-low': 'battery-low', 'ping-high': 'cell-signal-low', always: 'calendar-blank' };
 W.rules = {
   needs: ['state'],
   create(box, { o }) {
@@ -714,14 +717,14 @@ W.rules = {
         const k = JSON.stringify([rules, active, paused]);
         if (k === key) return;
         key = k;
-        btn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+        btn.replaceChildren(icon(paused ? 'play' : 'pause'), paused ? ' Resume' : ' Pause');
         btn.hidden = !D.state;
         box.classList.toggle('paused', !!paused);
         if (!rules.length) { list.replaceChildren(h('div', 'empty', 'Add rules in Settings › Rules')); return; }
         const sorted = [...rules].sort((a, b) => active.includes(b.id) - active.includes(a.id));
         list.replaceChildren(...(paused ? [h('div', 'ru-note', `Paused until ${fmtHM(new Date(rulesPaused))}`)] : []),
           ...sorted.map((r) => h('div', 'ru-row' + (active.includes(r.id) && !paused ? ' on' : ''),
-            h('span', 'ru-ico', RULE_WHEN[r.when] || '⚡'), h('span', 'ru-name', r.name || r.when), h('i', 'ru-dot'))));
+            h('span', 'ru-ico', icon(RULE_WHEN[r.when] || 'lightning')), h('span', 'ru-name', r.name || r.when), h('i', 'ru-dot'))));
       },
     };
   },
@@ -749,8 +752,8 @@ W.chargecare = {
       if (!(b.level >= 0)) return;
       q('.cc-fg').style.strokeDasharray = `${(C * b.level) / 100} ${C}`;
       q('.cc-pct').textContent = b.level + '%';
-      q('.cc-state').textContent = b.plugged ? '⚡' : '🔋';
-      const col = b.level <= 20 ? '#ef4444' : ch.enabled && b.level > max ? '#f59e0b' : b.plugged ? '#22c55e' : 'rgb(var(--ambient))';
+      q('.cc-state').replaceChildren(icon(b.plugged ? 'lightning' : 'battery-full'));
+      const col = b.level <= 20 ? '#f0604d' : ch.enabled && b.level > max ? '#f2c94c' : b.plugged ? '#4cc38a' : 'var(--lamp)';
       box.style.setProperty('--cc', col);
       q('.cc-text').textContent = !ch.enabled ? `Battery care is off${b.temp ? ` · ${b.temp.toFixed(0)} °C` : ''}`
         : b.plugged ? `Charges up to ${max}%` + (b.level >= max ? ' · power off soon' : '') : `Charges again at ${min}%`;
@@ -816,7 +819,7 @@ W.gpu = {
       if (c) e.style.setProperty('--c', c);
       return e;
     };
-    const heat = (t, max) => (t >= max - 5 ? '#ef4444' : t >= max - 15 ? '#f59e0b' : '#f97316');
+    const heat = (t, max) => (t >= max - 5 ? '#f0604d' : t >= max - 15 ? '#f2c94c' : '#ef8b6a');
     return {
       update() {
         const g = gpusOf(D.state)[idx];
@@ -839,11 +842,11 @@ W.gpu = {
         const list = [];
         const mem = gpuMem(g);
         if (mem) list.push(meter(mem.label === 'VRAM' ? 'VRAM' : 'GPU memory', `${r1(mem.used)} / ${Math.round(mem.total)} GB`, (mem.used / mem.total) * 100));
-        if (!g.integrated && g.sharedTotal && g.sharedUsed != null) list.push(meter('Shared memory', `${r1(g.sharedUsed)} GB`, (g.sharedUsed / g.sharedTotal) * 100, '#64748b'));
+        if (!g.integrated && g.sharedTotal && g.sharedUsed != null) list.push(meter('Shared memory', `${r1(g.sharedUsed)} GB`, (g.sharedUsed / g.sharedTotal) * 100, '#66676c'));
         if (g.power != null) {
           list.push(meter('Power', g.powerLimit ? `${Math.round(g.power)} / ${Math.round(g.powerLimit)} W` : `${Math.round(g.power)} W`,
-            g.powerLimit ? (g.power / g.powerLimit) * 100 : g.powerPct, '#facc15'));
-        } else if (g.powerPct != null) list.push(meter('Power', `${Math.round(g.powerPct)}% of limit`, g.powerPct, '#facc15'));
+            g.powerLimit ? (g.power / g.powerLimit) * 100 : g.powerPct, '#f2c94c'));
+        } else if (g.powerPct != null) list.push(meter('Power', `${Math.round(g.powerPct)}% of limit`, g.powerPct, '#f2c94c'));
         const hottest = Math.max(g.temp ?? -1, g.hotSpot ?? -1);
         if (hottest >= 0) {
           const max = g.tempMax || (g.hotSpot != null ? 110 : 100);

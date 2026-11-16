@@ -1,5 +1,6 @@
 import { API, PANEL_HEADERS, api, applyState, D, evSeq, h, haptic, toast, store, t } from '../main.js';
 import { W } from '../registry.js';
+import { icon } from '../icons.js';
 
 let cached = null, at = 0, epoch = 0, pending = null;
 export function invalidateDeckState() {
@@ -186,7 +187,7 @@ function mediaView(box, options, mode) {
     shuffle = button('Shuffle', () => call('shuffle', current.shuffle ? 0 : 1));
     repeat = button('Repeat', () => call('repeat', current.repeat === 'None' ? 1 : current.repeat === 'Track' ? 2 : 0));
     controls.append(shuffle, repeat);
-  } else controls.append(button('⏮', () => call('prev'), 'Previous track'), button('⏯', () => call('playpause'), 'Play or pause'), button('⏭', () => call('next'), 'Next track'));
+  } else controls.append(button(icon('skip-back'), () => call('prev'), 'Previous track'), button(icon('play-pause'), () => call('playpause'), 'Play or pause'), button(icon('skip-forward'), () => call('next'), 'Next track'));
   return data => {
     current = selectedPlayer(data, options);
     title.textContent = current?.title || t('w.noMediaSelected'); source.textContent = current?.name || 'Choose a source in Media sources';

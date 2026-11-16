@@ -50,3 +50,5 @@ tools/ui-tests/test-results/
 
 *.log
 *.txt
+# ...except the licenses that ship beside the panel's bundled font and icons
+!/android/app/src/main/assets/www/*-LICENSE.txt

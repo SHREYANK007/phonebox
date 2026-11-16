@@ -22,6 +22,21 @@
   spike or a zero (#124, [rudycelekli](https://github.com/rudycelekli)).
 
 **Panel**
+- **New look.** The panel is drawn as a piece of desk hardware: a graphite faceplate, readouts set in recessed
+  wells, buttons as keycaps that press down, and colour kept for signals (indicator lamps, chart traces, LED
+  segments). Every live number uses the expanded width of [Mona Sans](https://github.com/github/mona-sans), which now
+  ships with the app (SIL Open Font License); widget labels are in sentence case instead of spaced capitals.
+  - Dials (gauges, AI quotas, Pomodoro, timers, battery) are segmented LED rings, and bar meters are LED ladders.
+  - AI quota rings stay neutral until usage nears a limit, then turn yellow (80%) and red (95%); the provider's
+    colour stays on its logo.
+  - The default accent is an amber lamp (`#f2a93b`). It lights the current page, the clock's colon and active
+    states, and no longer tints the background. Settings that still hold the old default (`#2dd4bf`) get the new one.
+  - Status colours (OK, warning, error, info) come from one palette, shared by the CSS and the widgets' scripts.
+  - Icons instead of emoji: weather, forecast, shortcut keys, page titles, the overview, Pomodoro, stopwatch and
+    timer keys, volume, batteries, Home Assistant, rules, Discord, OBS and Docker draw line icons from
+    [Phosphor](https://phosphoricons.com) (MIT). A shortcut's or page's icon can still be an emoji: common ones are
+    drawn as the matching icon, and an icon's name (`terminal-window`, `globe`, `lock`…) works too. Pomodoro rounds
+    done today show as dots.
 - **Discord** widget: the voice channel you are in, mute, deafen, leave and join, the voice channels of your servers
   and your Discord notifications. It talks to the Discord app on the computer, needs your own Discord application
   (see [docs/DISCORD.md](docs/DISCORD.md)), is off by default, and the controls and notifications are each a widget

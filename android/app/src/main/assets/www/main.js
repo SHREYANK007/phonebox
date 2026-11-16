@@ -4,6 +4,7 @@
 import { W } from './registry.js';
 import './appearance.js';
 import { cached } from './widgets/helpers.js';
+import { glyph, icon, iconHtml } from './icons.js';
 import './widgets/basic.js';
 import './widgets/stack.js';
 import './widgets/time.js';
@@ -229,7 +230,7 @@ export function chart(canvas, series, opts = {}) {
     g.beginPath();
     g.moveTo(x0, y(d[0]));
     for (let i = 1; i < d.length; i++) g.lineTo(x0 + i * step, y(d[i]));
-    g.lineWidth = 1.6 * dpr;
+    g.lineWidth = 1.5 * dpr;
     g.strokeStyle = s.color;
     g.lineJoin = 'round';
     g.stroke();
@@ -237,7 +238,7 @@ export function chart(canvas, series, opts = {}) {
     g.lineTo(x0, hh);
     g.closePath();
     const grad = g.createLinearGradient(0, 0, 0, hh);
-    grad.addColorStop(0, s.color + '55');
+    grad.addColorStop(0, s.color + '38');
     grad.addColorStop(1, s.color + '00');
     g.fillStyle = grad;
     g.fill();
@@ -254,8 +255,11 @@ export function ringSvg(pct, elapsed) {
     const [x1, y1] = p(35), [x2, y2] = p(49);
     tick = `<line class="pace" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
   }
+  // The ring reads as 60 LED segments: a dashed circle in the well's colour cuts both the scale and the lit run.
+  const per = c / 60;
   return `<svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="${r}"/>` +
-    `<circle class="fg" cx="50" cy="50" r="${r}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>${tick}</svg>`;
+    `<circle class="fg" cx="50" cy="50" r="${r}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>` +
+    `<circle class="seg" cx="50" cy="50" r="${r}" stroke-dasharray="${(per * 0.24).toFixed(3)} ${(per * 0.76).toFixed(3)}"/>${tick}</svg>`;
 }
 
 // ---------------------------------------------------------------- metrics (stat, gauge, chart widgets)
@@ -298,13 +302,13 @@ export const METRICS = {
   vram: { label: 'VRAM', name: 'Video memory', color: '--gpu', unit: '%', max: () => 100,
     val: (s) => { const m = gpuMem(gpuOf(s)); return m ? (m.used / m.total) * 100 : null; },
     sub: (s) => { const m = gpuMem(gpuOf(s)); return m ? memText(m) : 'No GPU data'; } },
-  net: { label: 'NETWORK', name: 'Network', color: '--net', rate: true, hist: 'down', max: netMax, val: (s) => s.pc?.netDownBps,
+  net: { label: 'Network', name: 'Network', color: '--net', rate: true, hist: 'down', max: netMax, val: (s) => s.pc?.netDownBps,
     sub: (s) => '↑ ' + rateStr(s.pc?.netUpBps) + (s.ping?.ms != null ? ` · ${Math.round(s.ping.ms)} ms` : '') },
-  down: { label: 'DOWNLOAD', name: 'Download', color: '--net', rate: true, max: netMax, val: (s) => s.pc?.netDownBps },
-  up: { label: 'UPLOAD', name: 'Upload', color: '--up', rate: true, max: netMax, val: (s) => s.pc?.netUpBps },
-  ping: { label: 'PING', name: 'Ping', color: '#38bdf8', unit: 'ms', max: () => Math.max(50, ...hist.ping) * 1.2, val: (s) => s.ping?.ms,
+  down: { label: 'Download', name: 'Download', color: '--net', rate: true, max: netMax, val: (s) => s.pc?.netDownBps },
+  up: { label: 'Upload', name: 'Upload', color: '--up', rate: true, max: netMax, val: (s) => s.pc?.netUpBps },
+  ping: { label: 'Ping', name: 'Ping', color: '#54c2d9', unit: 'ms', max: () => Math.max(50, ...hist.ping) * 1.2, val: (s) => s.ping?.ms,
     sub: (s) => (s.ping ? `avg ${s.ping.avgMs ?? '—'} ms · loss ${s.ping.lossPct}%` : '') },
-  gputemp: { label: 'GPU TEMP', name: 'GPU temperature', color: '#f97316', unit: '°C', max: () => 100, hot: [75, 85], val: (s) => gpuOf(s)?.temp,
+  gputemp: { label: 'GPU temp', name: 'GPU temperature', color: '#ef8b6a', unit: '°C', max: () => 100, hot: [75, 85], val: (s) => gpuOf(s)?.temp,
     sub: (s) => {
       const g = gpuOf(s);
       if (!g) return 'No GPU data';
@@ -313,13 +317,13 @@ export const METRICS = {
         g.clock != null ? `${Math.round(g.clock)} MHz` : null].filter(Boolean);
       return detail.length ? detail.join(' · ') : (g.temp != null ? 'Temperature' : 'No GPU data');
     } },
-  hotspot: { label: 'HOT SPOT', name: 'GPU hot spot', color: '#ef4444', unit: '°C', max: () => 110, hot: [90, 100], val: (s) => gpuOf(s)?.hotSpot,
+  hotspot: { label: 'Hot spot', name: 'GPU hot spot', color: '#f0604d', unit: '°C', max: () => 110, hot: [90, 100], val: (s) => gpuOf(s)?.hotSpot,
     sub: (s) => {
       const g = gpuOf(s);
       if (g?.hotSpot == null) return 'needs LibreHardwareMonitor';
       return [g.temp != null ? `Edge ${Math.round(g.temp)}°` : null, g.memTemp != null ? `Memory ${Math.round(g.memTemp)}°` : null].filter(Boolean).join(' · ');
     } },
-  gpupower: { label: 'GPU POWER', name: 'GPU power', color: '#facc15', unit: (s) => (gpuOf(s)?.power != null ? 'W' : '%'),
+  gpupower: { label: 'GPU power', name: 'GPU power', color: '#f2c94c', unit: (s) => (gpuOf(s)?.power != null ? 'W' : '%'),
     max: (s) => { const g = gpuOf(s); return g?.power != null ? Math.max(g.powerLimit || 0, ...hist.gpupower, 50) : 100; },
     val: (s) => { const g = gpuOf(s); return g?.power ?? g?.powerPct; },
     sub: (s) => {
@@ -328,9 +332,9 @@ export const METRICS = {
       if (g.power != null && g.powerLimit) return `of ${Math.round(g.powerLimit)} W limit`;
       return g.power != null ? shortGpu(g.name) : 'of the power limit';
     } },
-  gpuclock: { label: 'GPU CLOCK', name: 'GPU clock', color: '#a78bfa', unit: 'MHz', max: () => Math.max(1000, ...hist.gpuclock) * 1.1, val: (s) => gpuOf(s)?.clock,
+  gpuclock: { label: 'GPU clock', name: 'GPU clock', color: '#6f9bff', unit: 'MHz', max: () => Math.max(1000, ...hist.gpuclock) * 1.1, val: (s) => gpuOf(s)?.clock,
     sub: (s) => { const g = gpuOf(s); return g?.memClock != null ? `Memory ${Math.round(g.memClock)} MHz` : g?.clock == null ? 'No clock data' : ''; } },
-  cputemp: { label: 'CPU TEMP', name: 'CPU temperature', color: '#fb7185', unit: '°C', max: () => 100, hot: [75, 85], val: (s) => s.pc?.cpuTemp,
+  cputemp: { label: 'CPU temp', name: 'CPU temperature', color: '#ef8b6a', unit: '°C', max: () => 100, hot: [75, 85], val: (s) => s.pc?.cpuTemp,
     sub: (s) => (s.pc?.cpuTemp == null ? 'needs LibreHardwareMonitor' : shortCpu(s.pc?.cpuName)) },
 };
 
@@ -343,16 +347,18 @@ export function metricText(m, s) {
 }
 
 // ---------------------------------------------------------------- weather (Open-Meteo, straight from the phone)
+// [description, icon by day, icon by night] (names from icons.js)
 export const WX = {
-  0: ['Clear', '☀️', '🌙'], 1: ['Mostly clear', '🌤️', '🌙'], 2: ['Partly cloudy', '⛅', '☁️'], 3: ['Overcast', '☁️', '☁️'],
-  45: ['Fog', '🌫️'], 48: ['Rime fog', '🌫️'],
-  51: ['Light drizzle', '🌦️'], 53: ['Drizzle', '🌦️'], 55: ['Heavy drizzle', '🌧️'], 56: ['Freezing drizzle', '🌧️'], 57: ['Freezing drizzle', '🌧️'],
-  61: ['Light rain', '🌦️'], 63: ['Rain', '🌧️'], 65: ['Heavy rain', '🌧️'], 66: ['Freezing rain', '🌧️'], 67: ['Freezing rain', '🌧️'],
-  71: ['Light snow', '🌨️'], 73: ['Snow', '🌨️'], 75: ['Heavy snow', '❄️'], 77: ['Snow grains', '🌨️'],
-  80: ['Light showers', '🌦️'], 81: ['Showers', '🌧️'], 82: ['Heavy showers', '⛈️'], 85: ['Snow showers', '🌨️'], 86: ['Heavy snow showers', '❄️'],
-  95: ['Thunderstorm', '⛈️'], 96: ['Thunderstorm, hail', '⛈️'], 99: ['Severe hail', '⛈️'],
+  0: ['Clear', 'sun', 'moon-stars'], 1: ['Mostly clear', 'cloud-sun', 'cloud-moon'], 2: ['Partly cloudy', 'cloud-sun', 'cloud-moon'], 3: ['Overcast', 'cloud', 'cloud'],
+  45: ['Fog', 'cloud-fog'], 48: ['Rime fog', 'cloud-fog'],
+  51: ['Light drizzle', 'cloud-rain'], 53: ['Drizzle', 'cloud-rain'], 55: ['Heavy drizzle', 'cloud-rain'], 56: ['Freezing drizzle', 'cloud-rain'], 57: ['Freezing drizzle', 'cloud-rain'],
+  61: ['Light rain', 'cloud-rain'], 63: ['Rain', 'cloud-rain'], 65: ['Heavy rain', 'cloud-rain'], 66: ['Freezing rain', 'cloud-rain'], 67: ['Freezing rain', 'cloud-rain'],
+  71: ['Light snow', 'cloud-snow'], 73: ['Snow', 'cloud-snow'], 75: ['Heavy snow', 'snowflake'], 77: ['Snow grains', 'cloud-snow'],
+  80: ['Light showers', 'cloud-rain'], 81: ['Showers', 'cloud-rain'], 82: ['Heavy showers', 'cloud-lightning'], 85: ['Snow showers', 'cloud-snow'], 86: ['Heavy snow showers', 'snowflake'],
+  95: ['Thunderstorm', 'cloud-lightning'], 96: ['Thunderstorm, hail', 'cloud-lightning'], 99: ['Severe hail', 'cloud-lightning'],
 };
-export const wxIcon = (code, day = 1) => { const x = WX[code] || ['—', '🌡️']; return day === 0 && x[2] ? x[2] : x[1]; };
+/** The icon name for a weather code (night variants where there are any). */
+export const wxIcon = (code, day = 1) => { const x = WX[code] || ['—', 'thermometer']; return day === 0 && x[2] ? x[2] : x[1]; };
 
 export async function loadWeather(force = false) {
   const { lat, lon } = cfg.weather || DEFAULT_CFG.weather;
@@ -398,7 +404,7 @@ export function wxBlock() {
   e.update = () => {
     const l = wxLines();
     if (!l) { e.querySelector('.wx-desc').textContent = D.weather === null ? t('w.loading') : t('w.weatherUnavailable'); return; }
-    e.querySelector('.wx-icon').textContent = l.icon;
+    e.querySelector('.wx-icon').replaceChildren(icon(l.icon) || '');
     e.querySelector('.wx-temp').textContent = l.temp;
     e.querySelector('.wx-desc').textContent = l.desc;
     e.querySelector('.wx-range').textContent = l.range;
@@ -409,7 +415,7 @@ export function wxBlock() {
 // ---------------------------------------------------------------- status line (clock widget)
 export function phoneBattery() {
   if (!bridge) return '';
-  try { const b = JSON.parse(bridge.battery()); return `📱 ${b.level}%${b.plugged ? ' ⚡' : ''}`; } catch (_) { return ''; }
+  try { const b = JSON.parse(bridge.battery()); return [icon('device-mobile'), ` ${b.level}%`, b.plugged ? icon('lightning') : null]; } catch (_) { return ''; }
 }
 
 export function quotaProviders() { return D.quotas?.providers || []; }
@@ -424,13 +430,13 @@ export function renderStatus(el) {
     const l = p.limits?.[0];
     if (!l) continue;
     const s = h('span', 'qm', h('span', 'sep', '·'), p.name + ' ', h('b', null, Math.round(l.percent) + '%'));
-    if (l.percent >= 95) s.style.color = '#f87171'; else if (l.percent >= 80) s.style.color = '#fbbf24';
+    if (l.percent >= 95) s.style.color = '#f0604d'; else if (l.percent >= 80) s.style.color = '#f2c94c';
     kids.push(s);
   }
   const waiting = (D.work?.sessions || []).filter((s) => s.status === 'waiting').length;
   if (waiting) kids.push(h('span', 'sep', '·'), h('span', 'smini', `${waiting} waiting`));
   const u = D.state?.update;
-  if (u) kids.push(h('span', 'sep', '·'), h('span', 'upd', u.app && via !== 'usb' ? `⬆ ${u.latest}: plug in USB to update` : `⬆ ${u.latest} available`));
+  if (u) kids.push(h('span', 'sep', '·'), h('span', 'upd', icon('arrow-circle-up'), u.app && via !== 'usb' ? ` ${u.latest}: plug in USB to update` : ` ${u.latest} available`));
   el.replaceChildren(...kids);
   // Too long for the widget: drop the quota summaries, the most dispensable part.
   while (el.scrollWidth > el.clientWidth + 1 && el.querySelector('.qm')) [...el.querySelectorAll('.qm')].pop().remove();
@@ -449,7 +455,7 @@ export async function runShortcut(btn, id) {
 }
 
 export function keyButton(s) {
-  const b = h('button', 'key' + (s.toggle ? ' toggle' : ''), h('span', 'k-icon', s.icon || '•'), h('span', 'k-label', s.label));
+  const b = h('button', 'key' + (s.toggle ? ' toggle' : ''), h('span', 'k-icon', glyph(s.icon || '•')), h('span', 'k-label', s.label));
   b.style.setProperty('--k', s.color || '#6b7280');
   b.dataset.id = s.id;
   b.addEventListener('click', () => runShortcut(b, s.id));
@@ -466,7 +472,10 @@ export const setMediaState = (m) => {
   emit('state');
 };
 // The background glow: the accent colour (Settings › Display), or the album art's colour while music plays.
-export let DEFAULT_AMBIENT = '45, 212, 191';
+// Amber indicator lamp. The old factory teal (#2dd4bf) is read as "never changed" and gets the new default too.
+export const FACTORY_AMBIENT = '242, 169, 59';
+export const LEGACY_ACCENTS = ['#2dd4bf'];
+export let DEFAULT_AMBIENT = FACTORY_AMBIENT;
 export let artTint = true;
 export let currentArtColor = null;
 export const setArtColor = (c) => { currentArtColor = c; setAmbient(c); };
@@ -495,7 +504,7 @@ export const setAmbient = (rgb) => document.documentElement.style.setProperty('-
 
 export const MEDIA_HTML = `
   <div class="m-top">
-    <div class="art-wrap"><img class="art" alt=""><div class="art-ph">♪</div></div>
+    <div class="art-wrap"><img class="art" alt=""><div class="art-ph">${iconHtml('music-notes')}</div></div>
     <div class="m-text"><div class="m-app"><span class="m-source-icon" aria-hidden="true"></span><span class="m-app-name">Media</span></div><div class="m-title">Nothing playing</div><div class="m-artist">Start something on the PC</div></div>
   </div>
   <div class="m-progress"><div class="bar"><div class="fill"></div></div><div class="times"><span class="m-pos">0:00</span><span class="m-dur">0:00</span></div></div>
@@ -755,7 +764,7 @@ export function fmtValue(x) {
   if (typeof x === 'boolean') return x ? 'On' : 'Off';
   return x == null ? '—' : String(x);
 }
-export const LEVEL_COLOR = { ok: '#22c55e', success: '#22c55e', warn: '#f59e0b', warning: '#f59e0b', error: '#ef4444', fail: '#ef4444', failure: '#ef4444', info: '#60a5fa' };
+export const LEVEL_COLOR = { ok: '#4cc38a', success: '#4cc38a', warn: '#f2c94c', warning: '#f2c94c', error: '#f0604d', fail: '#f0604d', failure: '#f0604d', info: '#6f9bff' };
 export const levelOf = (v) => v.level || (typeof v.value === 'string' ? (/^(ok|pass(ed)?|success|green|up|online)$/i.test(v.value) ? 'ok'
   : /^(fail(ed|ure)?|error|red|down|offline|broken)$/i.test(v.value) ? 'error' : /^(running|pending|building|warn(ing)?|yellow)$/i.test(v.value) ? 'warn' : '') : '');
 
@@ -903,13 +912,15 @@ export function handleEvent(e) {
   else if (e.kind === 'reload') location.reload();
 }
 
-export const WIDGET_ICONS = { discord: '💬', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
-  github: '🐙', processes: '⚙️', shortcuts: '🎛️', button: '🔘', worldclock: '🌍', calendar: '📅', pomodoro: '🍅', countdown: '⏳', note: '📝', command: '💻',
-  push: '📡', inbox: '📬', label: '🔤', analog: '🕰️', progress: '📆', stopwatch: '⏱️', timer: '⏲️', counter: '🔢', breathe: '🫁', quote: '💬',
-  checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️' };
+// the page overview draws each widget as its icon (names from icons.js)
+export const WIDGET_ICONS = { discord: 'chat-circle', rules: 'lightning', chargecare: 'battery-charging', nextup: 'skip-forward', moon: 'moon', wordclock: 'text-aa', clock: 'clock', weather: 'cloud-sun', forecast: 'cloud-rain', media: 'music-notes', stat: 'chart-line-up', gauge: 'gauge', chart: 'chart-bar', meters: 'hard-drives',
+  github: 'github-logo', processes: 'cpu', shortcuts: 'squares-four', button: 'cursor-click', worldclock: 'globe-hemisphere-east', calendar: 'calendar-blank', pomodoro: 'timer', countdown: 'hourglass-medium', note: 'note-pencil', command: 'terminal-window',
+  push: 'broadcast', inbox: 'tray', label: 'text-aa', analog: 'clock', progress: 'calendar-dots', stopwatch: 'timer', timer: 'alarm', counter: 'hash', breathe: 'wind', quote: 'quotes',
+  checklist: 'list-checks', battery: 'battery-full', topprocs: 'fire', quotaring: 'target', volume: 'speaker-high', sun: 'sun-horizon', air: 'leaf', hackernews: 'newspaper', exchange: 'swap', crypto: 'coins', image: 'image', pcswitch: 'monitor' };
 
 // ================================================================= pages
 export const pager = $('pager');
+$('ncGo').querySelector('.nc-ico')?.replaceChildren(icon('hourglass-medium'));
 export let pages = [];       // enabled pages
 export let mounted = [];     // { pi, def, inst, ctx, dirty }
 export let layoutKey = '';
@@ -1084,7 +1095,7 @@ let navTimer = 0;
 let lastAutoSwitch = 0;
 let lastNav = 0;              // last automatic switch (for the idle timer)
 const dsp = () => cfg.display || {};
-const pageLabel = (i) => { const p = pages[i]; return p ? `${p.icon || ''} ${p.title}`.trim() : ''; };
+const pageLabel = (i) => { const p = pages[i]; return p ? p.title : ''; };
 
 export function requestPage(d) {
   if (PREVIEW) return;
@@ -1278,7 +1289,7 @@ export function flashTitle() {
   const p = pages[curPage];
   if (!p || pages.length < 2) return;
   const t = $('ptitle');
-  t.textContent = `${p.icon || ''} ${p.title}`.trim();
+  t.replaceChildren(...(p.icon ? [glyph(p.icon), ' '] : []), p.title);
   t.classList.add('on');
   clearTimeout(titleTimer);
   titleTimer = setTimeout(() => t.classList.remove('on'), 900);
@@ -1301,11 +1312,11 @@ export function openOverview() {
   const ov = $('overview');
   const tile = (p, i) => {
     const map = h('div', 'ov-map', p.widgets.map((w) => {
-      const b = h('span', null, WIDGET_ICONS[w.type] || '▫️');
+      const b = h('span', null, icon(WIDGET_ICONS[w.type] || 'square'));
       b.style.gridArea = `${w.y + 1} / ${w.x + 1} / span ${w.h} / span ${w.w}`;
       return b;
     }));
-    const t = h('button', 'ov-tile' + (i === curPage ? ' on' : ''), map, h('div', 'ov-name', h('b', null, `${i + 1}`), ` ${p.icon || ''} ${p.title}`));
+    const t = h('button', 'ov-tile' + (i === curPage ? ' on' : ''), map, h('div', 'ov-name', h('b', null, `${i + 1}`), ' ', ...(p.icon ? [glyph(p.icon), ' '] : []), p.title));
     t.addEventListener('click', (e) => { e.stopPropagation(); haptic(); closeOverview(); goPage(i, true); });
     return t;
   };
@@ -1314,7 +1325,7 @@ export function openOverview() {
   // several paired computers: switch between them here (a USB cable always wins)
   const pcs = pairedPcs();
   $('ovPcs').replaceChildren(...(pcs.length > 1 ? pcs.map((pc) => {
-    const b = h('button', 'ov-pc' + (pc.active ? ' on' : ''), '🖥️ ' + (pc.name || t('panel.computer')));
+    const b = h('button', 'ov-pc' + (pc.active ? ' on' : ''), icon('monitor'), ' ' + (pc.name || t('panel.computer')));
     b.addEventListener('click', (e) => { e.stopPropagation(); switchPc(pc); });
     return b;
   }) : []));
@@ -1561,10 +1572,11 @@ export function applyDisplay() {
   I18n?.applyDom();
   // theme and accent apply in the preview and the browser too
   document.body.dataset.theme = ['amoled', 'midnight', 'warm', 'graphite'].includes(d.theme) ? d.theme : 'default';
-  const accent = hexToRgb(d.accent);
+  const accent = LEGACY_ACCENTS.includes(String(d.accent || '').toLowerCase()) ? null : hexToRgb(d.accent);
   const before = DEFAULT_AMBIENT;
-  DEFAULT_AMBIENT = accent || '45, 212, 191';
+  DEFAULT_AMBIENT = accent || FACTORY_AMBIENT;
   document.documentElement.style.setProperty('--accent', `rgb(${DEFAULT_AMBIENT})`);
+  document.documentElement.style.setProperty('--accent-rgb', DEFAULT_AMBIENT);
   artTint = d.artTint !== false;
   if (before !== DEFAULT_AMBIENT || !artTint) setAmbient(artTint ? currentArtColor : null);
   if (langChanged) { buildLayout(); renderApproval(); }
