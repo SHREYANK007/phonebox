@@ -31,7 +31,8 @@ public sealed class PushInputTests
     [InlineData("[]")]
     public void NonNumericPayloadTtlRemainsOrdinaryData(string ttl)
     {
-        var store = new PushStore(NullLogger<PushStore>.Instance, Path.Combine(Path.GetTempPath(), Guid.NewGuid()+".json"));
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+        var store = new PushStore(NullLogger<PushStore>.Instance, path);
         var data = JsonSerializer.Deserialize<JsonElement>("{\"ttl\":"+ttl+",\"value\":1}");
         Assert.Null(store.Set("input", data, null));
         Assert.Null(store.Get("input")!.ExpiresAt);
@@ -41,6 +42,8 @@ public sealed class PushInputTests
         Assert.Null(store.Set("explicit", data, 60));
         Assert.NotNull(store.Get("explicit")!.ExpiresAt);
         store.Clear();
+        store.Dispose(); // saves now instead of 2 s later, so the file can be removed
+        File.Delete(path);
     }
 
     [Theory]

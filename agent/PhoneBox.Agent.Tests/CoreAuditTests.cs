@@ -48,7 +48,7 @@ public sealed class CoreAuditTests : IDisposable
     public void C2_ValuesReachDataJsonWhileAScriptKeepsPushing()
     {
         var data = Path.Combine(_dir, "data.json");
-        var s = new PushStore(NullLogger<PushStore>.Instance, data);
+        using var s = new PushStore(NullLogger<PushStore>.Instance, data);
         s.Set("door", JsonSerializer.SerializeToElement("open"), null);           // set once, must survive a restart
         var until = DateTime.UtcNow.AddSeconds(7);
         for (var i = 0; DateTime.UtcNow < until; i++)                             // e.g. a sensor script, once a second
@@ -57,7 +57,7 @@ public sealed class CoreAuditTests : IDisposable
             Thread.Sleep(1000);
         }
         Assert.True(File.Exists(data), "data.json was never written in 7 s of one push per second");
-        var restarted = new PushStore(NullLogger<PushStore>.Instance, data);
+        using var restarted = new PushStore(NullLogger<PushStore>.Instance, data);
         Assert.NotNull(restarted.Get("door"));
     }
 

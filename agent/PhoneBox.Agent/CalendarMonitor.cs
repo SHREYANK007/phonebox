@@ -130,9 +130,11 @@ public static class Ics
             var dtStart = e.FirstOrDefault(p => p.Name == "DTSTART");
             if (dtStart is null || ToUtc(dtStart, out var allDay, local) is not { } start) continue;
             var dtEnd = e.FirstOrDefault(p => p.Name == "DTEND");
+            var remainingTicks = DateTime.MaxValue.Ticks - start.Ticks;
             var end = dtEnd is not null && ToUtc(dtEnd, out _, local) is { } en ? en
-                : e.FirstOrDefault(p => p.Name == "DURATION") is { } dur && TryDuration(dur.Value, out var d) ? start + d
-                : allDay ? start.AddDays(1) : start;
+                : e.FirstOrDefault(p => p.Name == "DURATION") is { } dur && TryDuration(dur.Value, out var d)
+                    && d.Ticks >= -start.Ticks && d.Ticks <= remainingTicks ? start + d
+                : allDay ? start.AddTicks(Math.Min(TimeSpan.TicksPerDay, remainingTicks)) : start;
             var length = end - start;
             var title = Unescape(e.FirstOrDefault(p => p.Name == "SUMMARY")?.Value ?? "(no title)");
             var location = e.FirstOrDefault(p => p.Name == "LOCATION")?.Value is { Length: > 0 } loc ? Unescape(loc) : null;
@@ -220,6 +222,9 @@ public static class Ics
                 "YEARLY" => n <= 9999 - local.Year && local.AddYears((int)n) is var year && year.Day == local.Day ? [year] : [],
                 _ => period == 0 ? [local] : [],
             };
+            // YEARLY uses BYMONTH to generate candidates. For faster rules it limits them.
+            if (byMonth.Count > 0 && freq is ("DAILY" or "WEEKLY" or "MONTHLY"))
+                candidates = candidates.Where(date => byMonth.Contains(date.Month));
             var set = candidates.OrderBy(x => x).ToList();
             // BYSETPOS picks from each period's set: "the last weekday of the month" (Outlook) is BYDAY=MO,…,FR;BYSETPOS=-1
             if (bySetPos.Count > 0)
@@ -343,12 +348,19 @@ public static class Ics
     {
         // P1DT2H30M, PT45M, P1W
         d = TimeSpan.Zero;
-        var m = System.Text.RegularExpressions.Regex.Match(v, @"^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$");
+        var m = System.Text.RegularExpressions.Regex.Match(v, @"^([+-])?P(?:([0-9]+)W)?(?:([0-9]+)D)?(?:T(?:([0-9]+)H)?(?:([0-9]+)M)?(?:([0-9]+)S)?)?$");
         if (!m.Success) return false;
         int G(int i) => m.Groups[i].Success ? int.Parse(m.Groups[i].Value) : 0;
-        d = new TimeSpan(G(2) * 7 + G(3), G(4), G(5), G(6));
-        if (m.Groups[1].Value == "-") d = -d;
-        return true;
+        try
+        {
+            d = new TimeSpan(checked(G(2) * 7 + G(3)), G(4), G(5), G(6));
+            if (m.Groups[1].Value == "-") d = -d;
+            return true;
+        }
+        catch (Exception ex) when (ex is OverflowException or ArgumentOutOfRangeException)
+        {
+            return false;
+        }
     }
 
     private static IEnumerable<string> Unfold(string text)

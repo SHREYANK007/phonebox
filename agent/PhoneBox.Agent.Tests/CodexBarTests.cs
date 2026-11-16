@@ -139,7 +139,7 @@ public sealed class CodexBarTests
                 ]}
                 """);
             var cfg = new ConfigStore(cfgPath);
-            var push = new PushStore(NullLogger<PushStore>.Instance, Path.Combine(dir, "data.json"));
+            using var push = new PushStore(NullLogger<PushStore>.Instance, Path.Combine(dir, "data.json"));
             var quotas = new QuotaMonitor(NullLogger<QuotaMonitor>.Instance);
             quotas.SetStateForTest(
                 claude: new QuotaProvider("claude", "Claude", "Max",

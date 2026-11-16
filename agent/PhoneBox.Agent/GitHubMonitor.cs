@@ -76,6 +76,7 @@ public sealed class GitHubMonitor(ILogger<GitHubMonitor> log) : BackgroundServic
             using var nd = JsonDocument.Parse(await Gh(["api", "notifications?per_page=50"], ct));
             notifications = nd.RootElement.GetArrayLength();
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch { }
 
         return new GhSnapshot(Str(viewer, "login"), notifications, reviews, mine, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), null);
@@ -90,20 +91,18 @@ public sealed class GitHubMonitor(ILogger<GitHubMonitor> log) : BackgroundServic
         review, ci,
         DateTimeOffset.TryParse(Str(n, "updatedAt"), out var u) ? u.ToUnixTimeMilliseconds() : 0);
 
-    internal static async Task<string> Gh(string[] args, CancellationToken ct)
+    internal static Task<string> Gh(string[] args, CancellationToken ct)
     {
-        var psi = new ProcessStartInfo("gh")
-        {
-            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
-            WorkingDirectory = AppPaths.NeutralCwd,
-        };
+        var psi = new ProcessStartInfo("gh");
         foreach (var a in args) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start gh");
-        var outTask = p.StandardOutput.ReadToEndAsync(ct);
-        var errTask = p.StandardError.ReadToEndAsync(ct);
-        await p.WaitForExitAsync(ct);
-        if (p.ExitCode != 0) throw new InvalidOperationException("gh: " + (await errTask).Trim().Split('\n')[0]);
-        return await outTask;
+        return RunGh(psi, ct);
+    }
+
+    internal static async Task<string> RunGh(ProcessStartInfo psi, CancellationToken ct)
+    {
+        var result = await ToolProcess.RunAsync(psi, TimeSpan.FromSeconds(20), ct);
+        if (result.ExitCode != 0) throw new InvalidOperationException("gh: " + result.Error.Trim().Split('\n')[0]);
+        return result.Output;
     }
 
     private static string? Str(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

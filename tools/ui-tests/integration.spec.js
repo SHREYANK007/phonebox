@@ -291,6 +291,83 @@ test('multi option preserves saved unlisted quota provider IDs when toggling cho
   expect(saved).toContain('alibaba');
 });
 
+// Apply JSON used to assign the paste verbatim: a fragment without sections every renderer reads
+// (pages, display, night…) threw inside renderPages and left cfg broken until a reload.
+test('Apply JSON fills defaults for a partial config instead of breaking the editor', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto('/settings/#general');
+  // move away from the defaults first, so the checks below prove Apply JSON put them back
+  await page.locator('input[data-bind="night.brightness"]').fill('0.1');
+  await expect(page.locator('#nbv')).toHaveText('10%');
+  await page.locator('input[data-bind="display.showSeconds"]').setChecked(false, { force: true });
+  await page.locator('a[href="#advanced"]').click();
+  await page.locator('#json').fill('{"display": {"theme": "midnight"}}');
+  await page.locator('#applyJson').click();
+  await expect(page.locator('#jsonErr')).toHaveText('');
+  // the fragment has no pages array: defaults keep renderPages working — the empty list still shows its buttons
+  await page.locator('a[href="#pages"]').click();
+  await expect(page.locator('#pageTabs button', { hasText: 'New page' })).toBeVisible();
+  // and the form keeps answering: the night screen slider read its (defaulted) section without throwing
+  await page.locator('a[href="#general"]').click();
+  await expect(page.locator('#nbv')).toHaveText('2%'); // the agent's NightConfig default, not NaN%
+  await expect(page.locator('input[data-bind="display.showSeconds"]')).toBeChecked(); // DisplayConfig.ShowSeconds
+});
+
+// Apply JSON and page-file imports can drop a widget without a grid position. A drag then wrote NaN into
+// x/y/w/h, JSON.stringify turned that into null and the server refused the whole save as invalid JSON.
+test('Apply JSON gives pasted widgets a valid grid position', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto('/settings/#advanced');
+  await page.locator('#json').fill('{"pages": [{"id": "p", "title": "P", "widgets": [{"id": "w1", "type": "clock"}]}]}');
+  await page.locator('#applyJson').click();
+  await expect(page.locator('#jsonErr')).toHaveText('');
+  await page.locator('a[href="#pages"]').click();
+  const wb = page.locator('#canvas .wb');
+  await expect(wb).toHaveCount(1);
+  // a positionless clock takes its catalog default size at the top-left cell instead of an invalid gridArea
+  expect(await page.evaluate(() => { const { x, y, w, h } = cfg.pages[0].widgets[0]; return [x, y, w, h]; }))
+    .toEqual([0, 0, 6, 4]);
+  // a drag writes integer coordinates — before the fix it wrote NaN, which JSON.stringify saved as null
+  const cell = await page.locator('#canvas .cell').first().boundingBox();
+  const box = await wb.boundingBox();
+  await page.mouse.move(box.x + 20, box.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 20 + cell.width, box.y + 20 + cell.height, { steps: 5 });
+  await page.mouse.up();
+  expect(await page.evaluate(() => { const { x, y } = cfg.pages[0].widgets[0]; return [x, y]; })).toEqual([1, 1]);
+  expect(await page.evaluate(() => JSON.stringify(cfg))).not.toContain('"x":null');
+});
+
+// #159: when the forecast can't be fetched (no route to Open-Meteo, the agent's fallback refused), the weather says so
+// instead of "Loading…" for good, and the error answer is not kept as the forecast.
+test('a weather fetch that fails shows "Weather unavailable"', async ({ page }) => {
+  await page.route('https://api.open-meteo.com/**', (route) => route.abort());
+  await layout(page, [widget('clock', { weather: true })]);
+  await page.evaluate(() => localStorage.removeItem('wx'));
+  await page.reload();
+  await expect(page.locator('.wx-desc')).toHaveText('Weather unavailable');
+  expect(await page.evaluate(() => localStorage.getItem('wx'))).toBeNull();
+});
+
+// After a location change whose fetch fails, the panel must not show the previous city's forecast under the new name.
+test('a new weather location never shows the previous place\'s forecast', async ({ page }) => {
+  const forecast = { current: { temperature_2m: 31, apparent_temperature: 31, weather_code: 0, is_day: 1 }, daily: {}, hourly: {} };
+  let fail = false;
+  await page.route('https://api.open-meteo.com/**', (route) => (fail ? route.abort() : route.fulfill({ json: forecast })));
+  await layout(page, [widget('clock', { weather: true })], { weather: { city: 'Alpha', lat: 10, lon: 10 } });
+  await expect(page.locator('.wx-temp')).toHaveText('31°');
+
+  fail = true;
+  await page.evaluate(async () => {
+    const c = JSON.parse(localStorage.getItem('pb-demo-config'));
+    localStorage.setItem('pb-demo-config', JSON.stringify({ ...c, weather: { city: 'Beta', lat: 20, lon: 20 } }));
+    const m = await import('./main.js');
+    await m.loadConfig();
+  });
+  await expect(page.locator('.wx-desc')).toHaveText('Weather unavailable');
+  await expect(page.locator('.wx-temp')).not.toHaveText('31°');
+});
+
 // PRIVACY.md: the phone sends the weather location to Open-Meteo only while a page has a widget that uses the weather.
 test('the weather is fetched only while a widget needs it', async ({ page }) => {
   const asked = [];
@@ -323,6 +400,23 @@ test('the weather is fetched only while a widget needs it', async ({ page }) => 
 
   await layout(page, [widget('weather')]);
   await expect.poll(() => asked.length).toBeGreaterThan(0);
+});
+
+// the direct fetch and the agent's proxy fallback both failing is a different path from a JSON error body:
+// the demo answers /api/proxy inside its own fetch wrapper, so that failure is patched in the page
+test('a failed weather fetch and fallback leaves the widget unavailable, not loading (#159)', async ({ page }) => {
+  await page.route('https://api.open-meteo.com/**', (route) => route.abort());
+  await layout(page, [widget('forecast')]);
+  await page.evaluate(async () => {
+    const m = await import('./main.js');
+    m.D.weather = null;
+    localStorage.removeItem('wx');
+    const f = window.fetch;
+    window.fetch = (input, init) => (String(typeof input === 'string' ? input : input.url).includes('/proxy')
+      ? Promise.reject(new TypeError('proxy unreachable')) : f(input, init));
+    return m.loadWeather(true);
+  });
+  await expect(page.locator('.w-forecast .empty')).toHaveText('Weather unavailable');
 });
 
 // #58: switch between the computers paired over Wi-Fi with one tap; a USB cable always wins.
@@ -358,4 +452,83 @@ test('the Computers widget lists paired computers and switches between them', as
   await page.screenshot({ path: 'test-results/pcswitch-usb.png' });
   expect(errors).toEqual([]);
   await ctx.close();
+});
+
+test('docker widget clears loading state when filtered or stopped containers yield an empty list', async ({ page }) => {
+  await layout(page, [widget('docker', { title: 'Podman', filter: 'redis', stopped: false })]);
+  await expect(page.locator('.w-docker .w-title')).toContainText('Podman 0/1');
+  await expect(page.locator('.w-docker .empty')).toHaveText('No running containers (1 stopped)');
+
+  await layout(page, [widget('docker', { title: 'Podman', filter: 'missing', stopped: false })]);
+  await expect(page.locator('.w-docker .w-title')).toContainText('Podman 0/0');
+  await expect(page.locator('.w-docker .empty')).toHaveText('No containers match "missing"');
+});
+
+test('the charge guard serves the battery the phone reports', async ({ page }) => {
+  await layout(page, [widget('clock')]);
+  // the panel posts the demo phone's battery (82 %) a few seconds after boot; /api/charge must serve the report
+  await expect.poll(() => page.evaluate(() => fetch('/api/charge').then((r) => r.json()).then((j) => j.phone)), { timeout: 15000 })
+    .toMatchObject({ level: 82, plugged: true, temp: 29.5 });
+});
+
+// The agent sends headlines without their links; a tap asks the agent to open the article by its id.
+test('news feeds list headlines and open one on the PC by its id', async ({ page }) => {
+  await layout(page, [widget('feeds', { title: 'News', feed: '', showSource: true, showTime: true, open: true })]);
+  // the demo answers inside the page, so the call is recorded there
+  await page.evaluate(() => {
+    const real = window.fetch;
+    window.__opened = [];
+    window.fetch = (url, init) => {
+      if (String(url).includes('/feeds/open')) window.__opened.push({ id: new URL(String(url), location.href).searchParams.get('id'), method: init?.method });
+      return real(url, init);
+    };
+  });
+  const rows = page.locator('.w-feeds .fd-i');
+  await expect(rows.first()).toContainText('e-ink weather station');
+  await expect(rows.first().locator('.fd-m')).toContainText('Hackaday');
+  await rows.first().click();
+  await expect.poll(() => page.evaluate(() => window.__opened)).toEqual([{ id: 'f1', method: 'POST' }]);
+  await expect(page.locator('#toast')).toContainText('Opening on the PC');
+
+  // opening is off until the widget allows it: a tap asks nothing of the PC
+  await layout(page, [widget('feeds', { title: 'News', open: false })]);
+  await page.evaluate(() => {
+    const real = window.fetch;
+    window.__opened = [];
+    window.fetch = (url, init) => { if (String(url).includes('/feeds/open')) window.__opened.push(String(url)); return real(url, init); };
+  });
+  await expect(page.locator('.w-feeds .fd-i.link')).toHaveCount(0);
+  await page.locator('.w-feeds .fd-i').first().click();
+  await expect(page.locator('#toast')).toContainText('Open articles on the PC');
+  expect(await page.evaluate(() => window.__opened)).toEqual([]);
+
+  // one feed only, by its name
+  await layout(page, [widget('feeds', { title: 'Tech', feed: 'tech news', showSource: false, showTime: false })]);
+  await expect(page.locator('.w-feeds .fd-i').first()).toContainText('Rust 2.0');
+  await expect(page.locator('.w-feeds .fd-m')).toHaveCount(0);
+  await layout(page, [widget('feeds', { title: 'None', feed: 'nothing like this' })]);
+  await expect(page.locator('.w-feeds .empty')).toHaveText('No headlines from "nothing like this"');
+});
+
+// Each News feeds widget follows its own "open" option, and the demo, like the agent, ignores disabled pages.
+test('news feeds open only from a widget whose own option allows it', async ({ page }) => {
+  await layout(page, [
+    { ...widget('feeds', { title: 'Open', open: true }), id: 'a', w: 6 },
+    { ...widget('feeds', { title: 'Closed', open: false }), id: 'b', x: 6, w: 6 },
+  ]);
+  await expect(page.locator('.w-feeds').nth(0).locator('.fd-i.link').first()).toBeVisible();
+  await expect(page.locator('.w-feeds').nth(1).locator('.fd-i').first()).toBeVisible();
+  await expect(page.locator('.w-feeds').nth(1).locator('.fd-i.link')).toHaveCount(0);
+
+  // the only widget that allows opening sits on a disabled page: the demo refuses like the agent does
+  await page.goto('/panel/');
+  await page.evaluate(() => {
+    localStorage.setItem('pb-demo-config', JSON.stringify({ night: { enabled: false }, shortcuts: [], pages: [
+      { id: 'on', title: 'On', enabled: true, widgets: [{ id: 'x', type: 'feeds', x: 0, y: 0, w: 12, h: 6, options: { open: false } }] },
+      { id: 'off', title: 'Off', enabled: false, widgets: [{ id: 'y', type: 'feeds', x: 0, y: 0, w: 12, h: 6, options: { open: true } }] },
+    ] }));
+  });
+  await page.reload();
+  const canOpen = await page.evaluate(() => fetch('/agent/api/feeds').then((r) => r.json()).then((j) => j.canOpen));
+  expect(canOpen).toBe(false);
 });

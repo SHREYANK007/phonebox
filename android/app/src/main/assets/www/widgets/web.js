@@ -1,5 +1,6 @@
-import { $, ago, h, safeFetch, store, t, tick } from '../main.js';
+import { $, API, PANEL_HEADERS, ago, api, h, haptic, safeFetch, store, t, tick, toast } from '../main.js';
 import { W } from '../registry.js';
+import { icon } from '../icons.js';
 import { cached, every, fmtNum, lines, pctSpan, sparkLine } from './helpers.js';
 
 // ---------------------------------------------------------------- the internet
@@ -32,6 +33,64 @@ W.hackernews = {
   },
 };
 
+// Headlines from the RSS / Atom feeds set up on the PC. The agent fetches them (at most every 15 minutes); the
+// phone gets titles, the feed's name and times, and opens an article on the PC by its id.
+W.feeds = {
+  needs: ['tick'],
+  create(box, { o }) {
+    const only = String(o.feed || '').trim().toLowerCase();
+    const showSource = o.showSource !== false, showTime = o.showTime !== false;
+    const list = h('div', 'fd-list', h('div', 'empty', t('w.loading')));
+    const sub = h('span', 'w-sub', '');
+    box.style.setProperty('--c', 'var(--lamp)');
+    if (o.title !== '') box.append(h('div', 'w-title', o.title || 'News', sub));
+    box.append(list);
+    let data = null, lastKey = '', busy = null;
+    const open = async (it) => {
+      if (!it.openable || busy) return;
+      // this widget's own option, not just whether some widget allows it (the agent checks the latter)
+      if (o.open !== true || !data?.canOpen) { toast(t('w.feeds.openOff'), 'err'); return; }
+      haptic();
+      busy = it.id;
+      // one deadline for the request and its body, so a stalled answer can't leave the widget refusing taps
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
+      try {
+        const r = await fetch(`${API}/feeds/open?id=${encodeURIComponent(it.id)}`, { method: 'POST', cache: 'no-store', headers: PANEL_HEADERS, signal: ctl.signal });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok) toast(t('w.feeds.opening'), 'ok'); else toast(j.error || t('w.feeds.openFailed'), 'err');
+      } catch (_) { toast(t('panel.pcNoAnswer'), 'err'); }
+      finally { clearTimeout(timer); busy = null; }
+    };
+    const render = () => {
+      const items = (data?.items || []).filter((i) => !only || i.source.toLowerCase() === only);
+      const rows = Math.max(1, Math.floor((box.clientHeight - (o.title !== '' ? 30 : 6)) / 33));
+      const key = JSON.stringify([!!data, data?.canOpen, items.slice(0, rows).map((i) => i.id), data?.errors, rows, Math.floor(Date.now() / 60_000)]);
+      if (key === lastKey) return;
+      lastKey = key;
+      const err = (data?.errors || []).filter((e) => !only || e.toLowerCase().startsWith(only + ':'));
+      sub.replaceChildren(err.length ? icon('warning', 'fd-warn') : '');
+      sub.title = err.join('\n');
+      if (!data) return;
+      if (!items.length) {
+        list.replaceChildren(h('div', 'empty', err.length ? err[0] : data.updated && (data.items || []).length ? t('w.feeds.noneFrom', { name: o.feed }) : t('w.feeds.addInSettings')));
+        return;
+      }
+      list.replaceChildren(...items.slice(0, rows).map((it) => {
+        const meta = [showSource ? it.source : '', showTime && it.published ? ago(it.published) : ''].filter(Boolean).join(' · ');
+        const row = h('div', 'fd-i' + (it.openable && o.open === true && data.canOpen ? ' link' : ''), h('div', 'fd-t', it.title), meta ? h('div', 'fd-m', meta) : null);
+        row.onclick = () => open(it);
+        return row;
+      }));
+    };
+    const load = every(60_000, async () => {
+      try { data = await api('/feeds', 'GET', 5000); lastKey = ''; render(); }
+      catch (_) { if (!data) list.replaceChildren(h('div', 'empty', t('w.offline'))); return false; }
+    });
+    return { update() { load(); render(); } };
+  },
+};
+
 W.exchange = {
   needs: ['tick'],
   create(box, { o }) {
@@ -43,13 +102,19 @@ W.exchange = {
       try {
         const from = new Date(Date.now() - 31 * 864e5).toISOString().slice(0, 10);
         const d = await cached(`fx:${base}:${syms}`, `https://api.frankfurter.dev/v1/${from}..?base=${base}&symbols=${syms.join(',')}`, 60 * 60_000);
-        const days = Object.keys(d.rates).sort();
+        const days = Object.keys(d.rates || {}).sort();
+        if (!days.length) {
+          box.querySelector('.w-sub').textContent = '';
+          list.replaceChildren(h('div', 'empty', t('w.ratesUnavailable')));
+          return false;
+        }
         box.querySelector('.w-sub').textContent = 'ECB · ' + days[days.length - 1];
         list.replaceChildren(...syms.map((s) => {
-          const series = days.map((k) => d.rates[k][s]).filter((x) => x != null);
-          const last = series[series.length - 1], prev = series.length > 1 ? series[series.length - 2] : last;
+          const series = days.map((k) => d.rates[k]?.[s]).filter((v) => Number.isFinite(v) && v > 0);
+          const last = series[series.length - 1], prev = series[series.length - 2];
+          const change = prev === undefined ? h('span', 'chg', '—') : pctSpan(((last - prev) / prev) * 100);
           const c = h('canvas', 'fx-sp');
-          const row = h('div', 'fx-i', h('b', null, s), h('span', 'fx-v', fmtNum(last)), pctSpan(((last - prev) / prev) * 100), c);
+          const row = h('div', 'fx-i', h('b', null, s), h('span', 'fx-v', fmtNum(last)), change, c);
           requestAnimationFrame(() => sparkLine(c, series, last >= series[0] ? '#4cc38a' : '#f0604d'));
           return row;
         }));

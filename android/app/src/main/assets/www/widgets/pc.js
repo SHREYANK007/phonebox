@@ -314,16 +314,23 @@ W.docker = {
     const load = async () => { try { data = await api('/docker'); } catch (_) {} };
     const render = (force = false) => {
       const snap = data?.snapshot;
-      const items = (snap?.containers || []).filter((c) => (o.stopped !== false || c.state === 'running')
-        && (!filter || c.name.toLowerCase().includes(filter) || (c.project || '').toLowerCase().includes(filter)));
-      const key = JSON.stringify([items, open, busy, box.clientHeight]);
+      const matched = (snap?.containers || []).filter((c) => !filter
+        || c.name.toLowerCase().includes(filter) || (c.project || '').toLowerCase().includes(filter));
+      const items = o.stopped === false ? matched.filter((c) => c.state === 'running') : matched;
+      const key = JSON.stringify([!!data, snap?.available, snap?.error, snap?.updated === 0, matched.length, items, data?.control, open, busy, box.clientHeight]);
       if (!force && key === lastKey) return;
       lastKey = key;
       const running = items.filter((c) => c.state === 'running').length;
-      head.querySelector('.dk-count').textContent = snap?.available ? ` ${running}/${items.length}` : '';
-      if (!data) { list.replaceChildren(h('div', 'empty', t('w.loading'))); return; }
+      head.querySelector('.dk-count').textContent = snap?.available && (!snap.error || matched.length) ? ` ${running}/${matched.length}` : '';
+      if (!data || (!snap?.updated && !snap?.error)) { list.replaceChildren(h('div', 'empty', t('w.loading'))); return; }
       if (!snap.available || (snap.error && !items.length)) { list.replaceChildren(h('div', 'empty', snap.error || 'Docker is not running')); return; }
-      if (!items.length) { list.replaceChildren(h('div', 'empty', filter ? `No containers match "${o.filter}"` : 'No containers')); return; }
+      if (!items.length) {
+        const msg = matched.length
+          ? `No running containers (${matched.length} stopped)`
+          : filter ? `No containers match "${o.filter}"` : 'No containers';
+        list.replaceChildren(h('div', 'empty', msg));
+        return;
+      }
       list.replaceChildren(...items.map((c) => {
         const st = c.health === 'unhealthy' ? 'bad' : c.state === 'running' ? (c.health === 'starting' ? 'warn' : 'ok') : c.state === 'restarting' || c.state === 'paused' ? 'warn' : 'off';
         const row = h('div', 'dk-row ' + st + (open === c.id ? ' open' : ''),

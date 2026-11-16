@@ -5,7 +5,18 @@
 #   ./scripts/uninstall.sh --apk      # ... and the panel app on the connected phone
 set -euo pipefail
 purge=0; apk=0
-for a in "$@"; do case "$a" in --purge) purge=1 ;; --apk) apk=1 ;; esac; done
+for a in "$@"; do
+  case "$a" in
+    --purge) purge=1 ;;
+    --apk) apk=1 ;;
+    -h|--help)
+      printf '%s\n' 'Usage: uninstall.sh [--purge] [--apk]' \
+        'Remove the agent and its autostart entry. Settings are kept unless --purge is set.' \
+        'Use --apk to also remove the app from the connected phone.'
+      exit 0 ;;
+    *) echo "unknown option: $a (see --help)" >&2; exit 2 ;;
+  esac
+done
 
 if [ "$(uname -s)" = Darwin ]; then
   plist="$HOME/Library/LaunchAgents/net.oxog.phonebox.agent.plist"

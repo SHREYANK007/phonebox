@@ -211,9 +211,12 @@ public sealed class DiscordTests : IDisposable
             monitor.NotificationsOn = true;
             await server.WriteAsync(Frame(1, """{"evt":"NOTIFICATION_CREATE","data":{"title":"Ana","body":"secret DM"}}"""), cts.Token);
             await Until(() => monitor.Snapshot().Notifications.Count == 1);
-            File.SetLastWriteTimeUtc(_configPath, DateTime.UtcNow.AddSeconds(-5));
             Monitor(false, notifications: false);  // the widget's notifications are turned off in the settings
-            Assert.Empty(monitor.Snapshot().Notifications);  // not only after the monitor's next pass
+            // a write time of its own, so the store sees the change however coarse the file system's clock is
+            File.SetLastWriteTimeUtc(_configPath, DateTime.UtcNow.AddMinutes(1));
+            // the monitor's own pass never runs in this test, so the text going away can only come from Snapshot
+            // reading the settings itself
+            await Until(() => monitor.Snapshot().Notifications.Count == 0);
             cts.Cancel();
             try { await loop; } catch (OperationCanceledException) { }
         }

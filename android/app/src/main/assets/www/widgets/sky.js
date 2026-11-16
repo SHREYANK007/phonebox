@@ -53,30 +53,53 @@ export const AQI_BANDS = [[20, 'Good', '#22c55e'], [40, 'Fair', '#84cc16'], [60,
 W.air = {
   needs: ['tick'],
   create(box) {
+    const city = h('span', 'w-sub');
     const v = h('div', 'aq-v', '—'), cat = h('div', 'aq-c', t('w.loading')), chips = h('div', 'aq-chips');
-    box.append(h('div', 'w-title', 'Air quality', h('span', 'w-sub', cfg.weather?.city || '')), h('div', 'aq-main', v, cat), chips);
-    const load = every(30 * 60_000, async () => {
-      const { lat, lon } = cfg.weather || DEFAULT_CFG.weather;
-      try {
-        const d = await cached(`air:${lat},${lon}`, `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
-          '&current=european_aqi,pm2_5,pm10,ozone,nitrogen_dioxide&timezone=auto', 30 * 60_000);
-        const c = d.current || {};
-        const aqi = c.european_aqi;
-        const band = Number.isFinite(aqi) && aqi >= 0 ? AQI_BANDS.find((b) => aqi <= b[0]) : null;
-        if (band) {
-          box.style.setProperty('--c', band[2]);
-          v.textContent = Math.round(aqi);
-          cat.textContent = band[1] + ' · ' + t('w.euroAqi');
-        } else {
-          box.style.removeProperty('--c');
-          v.textContent = '—';
-          cat.textContent = t('w.unavailable');
+    box.append(h('div', 'w-title', 'Air quality', city), h('div', 'aq-main', v, cat), chips);
+    let coordinates, load;
+    const clearIndex = (message) => {
+      box.style.removeProperty('--c');
+      v.textContent = '—';
+      cat.textContent = message;
+    };
+
+    function loader(lat, lon, location) {
+      return every(30 * 60_000, async () => {
+        try {
+          const d = await cached(`air:${location}`, `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+            '&current=european_aqi,pm2_5,pm10,ozone,nitrogen_dioxide&timezone=auto', 30 * 60_000);
+          if (coordinates !== location) return;
+          const c = d.current || {};
+          const aqi = c.european_aqi;
+          const band = Number.isFinite(aqi) && aqi >= 0 ? AQI_BANDS.find((b) => aqi <= b[0]) : null;
+          if (band) {
+            box.style.setProperty('--c', band[2]);
+            v.textContent = Math.round(aqi);
+            cat.textContent = band[1] + ' · ' + t('w.euroAqi');
+          } else clearIndex(t('w.unavailable'));
+          chips.replaceChildren(...[['PM2.5', c.pm2_5], ['PM10', c.pm10], ['O₃', c.ozone], ['NO₂', c.nitrogen_dioxide]]
+            .filter((x) => x[1] != null).map(([n, x]) => h('span', 'chip', `${n} ${Math.round(x)}`)));
+        } catch (_) {
+          if (coordinates === location) cat.textContent = t('w.unavailable');
+          return false;
         }
-        chips.replaceChildren(...[['PM2.5', c.pm2_5], ['PM10', c.pm10], ['O₃', c.ozone], ['NO₂', c.nitrogen_dioxide]]
-          .filter((x) => x[1] != null).map(([n, x]) => h('span', 'chip', `${n} ${Math.round(x)}`)));
-      } catch (_) { cat.textContent = t('w.unavailable'); return false; }
-    });
-    return { update: load };
+      });
+    }
+
+    return {
+      update() {
+        const { city: name, lat, lon } = cfg.weather || DEFAULT_CFG.weather;
+        if (city.textContent !== (name || '')) city.textContent = name || '';
+        const location = `${lat},${lon}`;
+        if (coordinates !== location) {
+          coordinates = location;
+          clearIndex(t('w.loading'));
+          chips.replaceChildren();
+          load = loader(lat, lon, location);
+        }
+        load();
+      },
+    };
   },
 };
 

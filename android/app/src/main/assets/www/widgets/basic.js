@@ -111,7 +111,7 @@ W.media = {
       'YouTube Music': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ff0033"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#fff" stroke-width="1.4"/><path d="m10 8.5 5.5 3.5-5.5 3.5z" fill="#fff"/></svg>',
       'Internet Radio': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 6.8 18.5 2a1 1 0 0 1 .7 1.9L10.8 7H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2.2zm1.8 5.2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm6 1.5v1.8h4v-1.8h-4zm0 3.2v1.8h4v-1.8h-4z" fill="#38bdf8"/></svg>',
     };
-    let artId = -1, volTimer = 0;
+    let artId = -1, volTimer = 0, volumeRelease = 0;
     img.addEventListener('load', () => { img.classList.add('on'); setArtColor(averageColor(img)); });
     img.addEventListener('error', () => img.classList.remove('on'));
     box.querySelectorAll('[data-media]').forEach((btn) => btn.addEventListener('click', async () => {
@@ -138,13 +138,23 @@ W.media = {
       try { await api('/media/seek?ms=' + ms, 'POST'); } catch (_) {}
     });
     const paintVol = (v) => { vol.style.setProperty('--p', v + '%'); q('.vol-val').textContent = v; };
+    const cancelVolumeDrag = () => {
+      clearTimeout(volTimer);
+      clearTimeout(volumeRelease);
+      setVolDragging(vol, false);
+    };
     vol.addEventListener('input', () => {
-      setVolDragging(true);
+      clearTimeout(volumeRelease);
+      setVolDragging(vol, true);
       paintVol(vol.value);
       clearTimeout(volTimer);
       volTimer = setTimeout(() => api('/volume?level=' + vol.value, 'POST').catch(() => {}), 120);
     });
-    vol.addEventListener('change', () => setTimeout(() => setVolDragging(false), 600));
+    vol.addEventListener('change', () => {
+      clearTimeout(volumeRelease);
+      volumeRelease = setTimeout(() => setVolDragging(vol, false), 600);
+    });
+    vol.addEventListener('pointercancel', cancelVolumeDrag);
     q('.mute').addEventListener('click', async () => {
       haptic();
       if ((!D.state?.audio || D.state.audio.canControl === false)) return;
@@ -204,6 +214,7 @@ W.media = {
           else { img.classList.remove('on'); setArtColor(null); }
         }
       },
+      destroy: cancelVolumeDrag,
     };
   },
 };

@@ -160,8 +160,9 @@ table.items td.val { font-family: Consolas, monospace; font-size: 12px; max-widt
 .phone-row .row { gap: 10px; }
 .phone-pages { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
 .cal-row { display: grid; grid-template-columns: 160px minmax(0, 1fr) 44px auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+.feed-row { grid-template-columns: 160px minmax(0, 1fr) auto; }
 .cal-row input[type=color] { width: 44px; height: 34px; padding: 2px; }
-@media (max-width: 700px) { .cal-row { grid-template-columns: 1fr 44px auto; } .cal-row .cal-url { grid-column: 1 / -1; grid-row: 2; } }
+@media (max-width: 700px) { .cal-row { grid-template-columns: 1fr 44px auto; } .feed-row { grid-template-columns: 1fr auto; } .cal-row .cal-url { grid-column: 1 / -1; grid-row: 2; } }
 
 /* shortcuts */
 .deck { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
@@ -418,6 +419,13 @@ dd { margin: 0; word-break: break-all; }
           <i>Publish a calendar</i> (ICS link); iCloud › share as a public calendar (<code>webcal://</code> works). The addresses stay on this computer.</p>
         <div id="calList"></div>
         <button class="btn sm" id="calAdd" data-i18n="s.calendars.add">＋ Add a calendar</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="s.feeds.title">News feeds</h3>
+        <p class="hint" style="margin:0 0 12px" data-i18n="s.feeds.hint">RSS or Atom feeds for the News feeds widget. This computer fetches each one at most every 15 minutes, only while a page shows a News feeds widget; the addresses stay here.</p>
+        <div id="feedList"></div>
+        <button class="btn sm" id="feedAdd" data-i18n="s.feeds.add">＋ Add a feed</button>
       </div>
 
       <div class="card">
@@ -852,6 +860,26 @@ function freeSpot(page, ww, hh, minW, minH) {
         for (let x = 0; x + w2 <= catalog.cols; x++)
           if (!overlaps(page, null, x, y, w2, h2)) return { x, y, w: w2, h: h2 };
   return null;
+}
+
+// Widgets that arrive through Apply JSON or an imported page file can lack a grid position. Without one a drag
+// wrote NaN into x/y/w/h, JSON.stringify turned that into null and the server refused the whole save as invalid.
+const gridNum = (v, min, max, fallback) => Math.min(max, Math.max(min, Number.isFinite(v) ? Math.round(v) : fallback));
+function fitPages(pages) {
+  const list = (Array.isArray(pages) ? pages : []).filter((p) => p && typeof p === 'object' && !Array.isArray(p));
+  for (const p of list) {
+    if (typeof p.id !== 'string') p.id = '';
+    p.widgets = (Array.isArray(p.widgets) ? p.widgets : []).filter((w) => w && typeof w === 'object' && !Array.isArray(w) && typeof w.type === 'string');
+    for (const w of p.widgets) {
+      if (typeof w.id !== 'string') w.id = '';
+      const d = widgetDef(w.type);
+      w.w = gridNum(w.w, Math.min(d.minW, catalog.cols), catalog.cols, d.w);
+      w.h = gridNum(w.h, Math.min(d.minH, catalog.rows), catalog.rows, d.h);
+      w.x = gridNum(w.x, 0, catalog.cols - w.w, 0);
+      w.y = gridNum(w.y, 0, catalog.rows - w.h, 0);
+    }
+  }
+  return list;
 }
 
 function renderPages() {
@@ -1558,7 +1586,7 @@ async function importPages() {
   const pages = Array.isArray(data) ? data : Array.isArray(data.pages) ? data.pages : data.widgets ? [data] : null;
   if (!pages?.length || !pages.every((x) => x && typeof x === 'object' && Array.isArray(x.widgets))) { toast('No pages found in that file', true); return; }
   const known = new Set(catalog.widgets.map((w) => w.type));
-  const clean = pages.map((x) => ({ ...JSON.parse(JSON.stringify(x)), id: '', widgets: x.widgets.filter((w) => known.has(w.type)).map((w) => ({ ...w, id: '' })) }));
+  const clean = fitPages(pages.map((x) => ({ ...JSON.parse(JSON.stringify(x)), id: '', widgets: x.widgets.filter((w) => known.has(w.type)).map((w) => ({ ...w, id: '' })) })));
   const dropped = pages.reduce((n, x) => n + x.widgets.length, 0) - clean.reduce((n, x) => n + x.widgets.length, 0);
   // Command widgets run their command on this computer once saved, and custom HTML can run shortcuts: a file from
   // someone else must not bring those in unseen. Show them and keep them only with an explicit yes.
@@ -1624,6 +1652,20 @@ $('obsTest').onclick = async () => {
     $('obsState').textContent = r.result;
   } catch (_) { $('obsState').textContent = 'Could not check'; }
 };
+// ---------------------------------------------------------------- news feeds
+function renderFeeds() {
+  cfg.feeds ??= [];
+  $('feedList').replaceChildren(...cfg.feeds.map((f, i) => h('div', { class: 'cal-row feed-row' },
+    h('input', { type: 'text', value: f.name || '', maxlength: '60', placeholder: 'Name, e.g. News', oninput: (e) => { f.name = e.target.value; changed(); } }),
+    h('input', { type: 'text', class: 'cal-url', value: f.url || '', placeholder: 'https://example.com/feed.xml', spellcheck: 'false',
+      oninput: (e) => { f.url = e.target.value.trim(); changed(); } }),
+    h('button', { class: 'btn sm danger', onclick: () => { cfg.feeds.splice(i, 1); renderFeeds(); changed(); } }, 'Remove'))));
+}
+$('feedAdd').onclick = () => {
+  cfg.feeds ??= [];
+  cfg.feeds.push({ name: '', url: '' });
+  renderFeeds(); changed();
+};
 $('calAdd').onclick = () => {
   cfg.calendars ??= [];
   cfg.calendars.push({ name: '', url: '', color: CAL_COLORS[cfg.calendars.length % CAL_COLORS.length] });
@@ -1678,7 +1720,7 @@ const RULE_PRESETS = [
 let activeRules = [];
 
 function renderRules() {
-  cfg.rules ??= []; cfg.calendars ??= []; cfg.phones ??= []; cfg.homeAssistant ??= {}; cfg.obs ??= { enabled: false, url: 'ws://127.0.0.1:4455' }; cfg.discord ??= { enabled: false };
+  cfg.rules ??= []; cfg.calendars ??= []; cfg.feeds ??= []; cfg.phones ??= []; cfg.homeAssistant ??= {}; cfg.obs ??= { enabled: false, url: 'ws://127.0.0.1:4455' }; cfg.discord ??= { enabled: false };
   $('rulePresets').replaceChildren(...RULE_PRESETS.map(([label, make]) => h('button', { class: 'btn', onclick: () => {
     cfg.rules.push({ id: '', enabled: true, ...make() });
     renderRules(); changed();
@@ -2473,17 +2515,24 @@ async function loadInfo() {
 }
 
 // ---------------------------------------------------------------- load / save
+// The form reads every section it binds and renders, so a config without one — an older export, or a
+// hand-trimmed paste in Apply JSON — gets the same defaults a fresh load does before anything renders.
+function fillDefaults() {
+  cfg.pages = fitPages(cfg.pages); cfg.shortcuts ??= []; cfg.rules ??= []; cfg.display ??= {}; cfg.night = { enabled: true, start: '00:30', end: '07:30', brightness: 0.02, ...cfg.night }; cfg.weather ??= {}; cfg.lan ??= { enabled: false, port: 8766 }; cfg.updates ??= { auto: true, repo: 'ersinkoc/phonebox' }; cfg.claude ??= { phoneApprovals: true, timeoutSec: 90, onlyWhenAway: false };
+  cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
+  for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true,
+    showSeconds: true, vibrate: true, volumeKeys: true, artTint: true, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf' })) cfg.display[k] ??= v;
+  cfg.charge ??= { enabled: false, min: 50, max: 80, method: 'ha' };
+}
+
 async function load() {
   if (!catalog.widgets.length) catalog = await (await fetch('/api/catalog')).json();
   const res = await fetch('/api/settings');
   cfgVersion = res.headers.get('X-Config-Version');
   cfg = await res.json();
-  cfg.pages ??= []; cfg.shortcuts ??= []; cfg.rules ??= []; cfg.display ??= {}; cfg.night ??= {}; cfg.weather ??= {}; cfg.lan ??= { enabled: false, port: 8766 }; cfg.updates ??= { auto: true, repo: 'ersinkoc/phonebox' }; cfg.claude ??= { phoneApprovals: true, timeoutSec: 90, onlyWhenAway: false };
-  cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
-  for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true })) cfg.display[k] ??= v;
-  cfg.charge ??= { enabled: false, min: 50, max: 80, method: 'ha' };
+  fillDefaults();
   saved = JSON.stringify(cfg);
-  renderPages(); renderDeck(); renderRules(); renderCalendars(); renderCharge(); bindForm(); changed(); loadInfo(); loadPhones();
+  renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderCharge(); bindForm(); changed(); loadInfo(); loadPhones();
 }
 
 async function save() {
@@ -2498,7 +2547,7 @@ async function save() {
 }
 
 $('save').onclick = save;
-$('revert').onclick = () => { cfg = JSON.parse(saved); renderPages(); renderDeck(); renderRules(); renderCalendars(); renderPhones(); renderCharge(); bindForm(); changed(); };
+$('revert').onclick = () => { cfg = JSON.parse(saved); renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderPhones(); renderCharge(); bindForm(); changed(); };
 // Over USB this also wakes the phone and brings the panel to the front (adb); over Wi-Fi the phone switches to the
 // page selected in the editor through the live stream.
 $('openPhone').onclick = async () => {
@@ -2577,7 +2626,14 @@ $('whClear').onclick = async () => { if (!confirm('Delete all pushed values?')) 
 setInterval(loadPushed, 4000);
 $('citySearch').onkeydown = (e) => { if (e.key === 'Enter') searchCity(); };
 $('applyJson').onclick = () => {
-  try { cfg = JSON.parse($('json').value); $('jsonErr').textContent = ''; renderPages(); renderDeck(); renderRules(); renderCalendars(); renderPhones(); renderCharge(); bindForm(); changed(); toast(t('s.jsonLoaded')); }
+  try {
+    const c = JSON.parse($('json').value);
+    if (typeof c !== 'object' || c === null || Array.isArray(c)) throw new Error('settings JSON must be an object');
+    cfg = c;
+    fillDefaults();
+    $('jsonErr').textContent = '';
+    renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderPhones(); renderCharge(); bindForm(); changed(); toast(t('s.jsonLoaded'));
+  }
   catch (e) { $('jsonErr').textContent = e.message; }
 };
 document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (!$('save').disabled) save(); } });

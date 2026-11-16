@@ -443,10 +443,16 @@ function Install-PhoneBox {
                 Write-Info 'revoke them under Developer options > "Revoke USB debugging authorisations".'
                 $device = Select-Phone $adb
                 if ($device) {
-                    $apk = Join-Path $temp "PhoneBox-$ver.apk"
-                    Get-Download "$base/PhoneBox-$ver.apk" $apk
-                    Assert-Checksum $apk $sums
-                    $phoneDone = Install-PhoneApp $adb $apk $device
+                    # The phone app is optional: a failed download or checksum skips it, and the agent (already
+                    # installed and stopped for the update) still starts below.
+                    try {
+                        $apk = Join-Path $temp "PhoneBox-$ver.apk"
+                        Get-Download "$base/PhoneBox-$ver.apk" $apk
+                        Assert-Checksum $apk $sums
+                        $phoneDone = Install-PhoneApp $adb $apk $device
+                    } catch {
+                        Write-Caution "Phone app skipped: $($_.Exception.Message)"
+                    }
                 }
             }
         }

@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+**Panel**
+- **New look.** The panel is drawn as a piece of desk hardware: a graphite faceplate, readouts set in recessed
+  wells, buttons as keycaps that press down, and colour kept for signals (indicator lamps, chart traces, LED
+  segments). Every live number uses the expanded width of [Mona Sans](https://github.com/github/mona-sans), which now
+  ships with the app (SIL Open Font License); widget labels are in sentence case instead of spaced capitals.
+  - Dials (gauges, AI quotas, Pomodoro, timers, battery) are segmented LED rings, and bar meters are LED ladders.
+  - AI quota rings stay neutral until usage nears a limit, then turn yellow (80%) and red (95%); the provider's
+    colour stays on its logo.
+  - The default accent is an amber lamp (`#f2a93b`). It lights the current page, the clock's colon and active
+    states, and no longer tints the background. Settings that still hold the old default (`#2dd4bf`) get the new one.
+  - Status colours (OK, warning, error, info) come from one palette, shared by the CSS and the widgets' scripts.
+  - Icons instead of emoji: weather, forecast, shortcut keys, page titles, the overview, Pomodoro, stopwatch and
+    timer keys, volume, batteries, Home Assistant, rules, Discord, OBS, Docker and News feeds draw line icons from
+    [Phosphor](https://phosphoricons.com) (MIT). A shortcut's or page's icon can still be an emoji: common ones are
+    drawn as the matching icon, and an icon's name (`terminal-window`, `globe`, `lock`…) works too. Pomodoro rounds
+    done today show as dots.
+
+## 0.9.14 — 2026-11-16
+
+A new News feeds widget for your RSS and Atom feeds; the weather says when it can't be fetched instead of loading for
+good; and Apply JSON in the settings copes with partial configs.
+
+**New widget**
+- **News feeds**: headlines from your RSS and Atom feeds; with the widget's "Open articles on the PC" option on, tap
+  one to open the article in the computer's browser (#108, asked for by [Vampie](https://github.com/Vampie)). Add the
+  feeds in Settings › General. The agent fetches each at most every 15 minutes and only while a page shows the widget;
+  the addresses stay on the computer, and a feed on the internet can't send the agent into your local network.
+
+**Panel**
+- When the forecast can't be fetched, the weather says "Weather unavailable" and tries again after 2 minutes, instead
+  of "Loading…" until the next 15-minute refresh; an error answer is no longer kept as the forecast (#159).
+- After a weather location change, the panel no longer shows the previous place's forecast while the new one loads or
+  fails, and the clock's weather line clears the old temperature when there is no forecast.
+- The Docker widget no longer stays on "Loading…" when its filter matches nothing; with "stopped" hidden and every
+  match stopped it says so (#152, [blx10](https://github.com/blx10)).
+
+**Settings**
+- Apply JSON accepts a partial config: missing sections and fields take the agent's defaults instead of breaking the
+  editor, and anything that isn't a JSON object is refused (#150, [Seyamalam](https://github.com/Seyamalam)).
+- Widgets pasted through Apply JSON or imported from a page file without a grid position are placed on the grid, so
+  moving one no longer makes the agent refuse the whole save (#154, [Seyamalam](https://github.com/Seyamalam)).
+
+## 0.9.13 — 2026-11-16
+
+Two new widgets, Discord and All apps (macOS); the panel runs on phones whose WebView is stuck on Chromium 83; and
+some 40 fixes from an outside review: calendars, pushed values, settings, setup and the panel.
+
 **Agent**
 - A calendar feed with a recurring event whose `INTERVAL` is huge keeps its other events. Before, such a rule could
   run past the year 9999 and the whole feed failed, showing only its last good copy (#106,
@@ -20,23 +67,15 @@
 - The Antigravity quota falls back to the older status call when the summary can't be read (#122, [rudycelekli](https://github.com/rudycelekli)).
 - The network speed reads each adapter on its own, so a dock, a Wi-Fi reconnect or a counter reset no longer shows a
   spike or a zero (#124, [rudycelekli](https://github.com/rudycelekli)).
+- More fixes by [rudycelekli](https://github.com/rudycelekli):
+  - pushed values received just before a restart are saved instead of lost (#139);
+  - a daily, weekly or monthly calendar rule with `BYMONTH` ("every Monday in December") stays in those months (#140),
+    and one event with an impossible `DURATION` no longer drops the whole feed (#142);
+  - GitHub CLI calls time out after 20 s and a cancelled one is ended with its child processes (#141);
+  - `--config` with a bare file name works; it crashed at startup (#144);
+  - a settings tab that loaded before the config file was deleted can't overwrite it afterwards (#116).
 
 **Panel**
-- **New look.** The panel is drawn as a piece of desk hardware: a graphite faceplate, readouts set in recessed
-  wells, buttons as keycaps that press down, and colour kept for signals (indicator lamps, chart traces, LED
-  segments). Every live number uses the expanded width of [Mona Sans](https://github.com/github/mona-sans), which now
-  ships with the app (SIL Open Font License); widget labels are in sentence case instead of spaced capitals.
-  - Dials (gauges, AI quotas, Pomodoro, timers, battery) are segmented LED rings, and bar meters are LED ladders.
-  - AI quota rings stay neutral until usage nears a limit, then turn yellow (80%) and red (95%); the provider's
-    colour stays on its logo.
-  - The default accent is an amber lamp (`#f2a93b`). It lights the current page, the clock's colon and active
-    states, and no longer tints the background. Settings that still hold the old default (`#2dd4bf`) get the new one.
-  - Status colours (OK, warning, error, info) come from one palette, shared by the CSS and the widgets' scripts.
-  - Icons instead of emoji: weather, forecast, shortcut keys, page titles, the overview, Pomodoro, stopwatch and
-    timer keys, volume, batteries, Home Assistant, rules, Discord, OBS and Docker draw line icons from
-    [Phosphor](https://phosphoricons.com) (MIT). A shortcut's or page's icon can still be an emoji: common ones are
-    drawn as the matching icon, and an icon's name (`terminal-window`, `globe`, `lock`…) works too. Pomodoro rounds
-    done today show as dots.
 - **Discord** widget: the voice channel you are in, mute, deafen, leave and join, the voice channels of your servers
   and your Discord notifications. It talks to the Discord app on the computer, needs your own Discord application
   (see [docs/DISCORD.md](docs/DISCORD.md)), is off by default, and the controls and notifications are each a widget
@@ -51,6 +90,11 @@
   skipped (#135); Time Progress stays right on those days (#133); a Countdown with an impossible date such as
   February 31 shows a dash instead of a date in March (#132); Air quality with no index shows "unavailable" instead of
   0 (#134). All by [rudycelekli](https://github.com/rudycelekli).
+- Exchange rates show a dash instead of "NaN %" for a currency the feed doesn't have (#145); Air quality follows a new
+  weather location without a restart (#146); the Media volume slider no longer stays stuck after a cancelled drag,
+  which also blocked page swipes (#147). All by [rudycelekli](https://github.com/rudycelekli).
+- Nine settings texts that were still English in every language but Turkish are translated, and a test checks that
+  every language has every text (#136, [Seyamalam](https://github.com/Seyamalam)).
 - A chart whose metrics are all unknown shows the CPU instead of an error card (#125,
   [Seyamalam](https://github.com/Seyamalam)).
 - A Smart Stack's timer and alarm keep running and ring while the stack shows another card or another page is on
@@ -61,6 +105,13 @@
   and macOS autostart files quote paths with spaces and special characters (#118).
 - `scripts/install.ps1` builds into a temporary folder and stops the running agent only after the build succeeded
   (#120); `scripts/build.ps1` removes its per-platform staging folders (#127).
+- `scripts/uninstall.sh --help` prints its usage instead of removing PhoneBox, and a mistyped option stops before
+  changing anything (#138, [rudycelekli](https://github.com/rudycelekli)).
+- Setup starts the agent even when the optional phone-app download fails, on Linux and macOS (#143, [rudycelekli](https://github.com/rudycelekli)) and on
+  Windows (#149); the phone app is reported as skipped.
+- The setup guide has step-by-step instructions for LibreHardwareMonitor (#148), and the development notes name both
+  the SDK the app is built with and the Android version it runs on (#137,
+  [anandyakshit](https://github.com/anandyakshit)).
 - The winget release-notes link moved to the locale manifest, where winget reads it (#128).
 - The docs demo keeps a layout saved while its catalog loads (#129). All by [rudycelekli](https://github.com/rudycelekli).
 

@@ -194,6 +194,24 @@ watts, fan speed and clocks. Without it Windows still reports any GPU's load, VR
 cards get the full set from `nvidia-smi`. A PC with two GPUs (a graphics card and the processor's integrated one) shows
 both: the card is the main GPU, the GPU details widget can show either.
 
+#### LibreHardwareMonitor on Windows
+
+PhoneBox reads LibreHardwareMonitor's sensor list from `http://127.0.0.1:8085/data.json` whenever it is there; there
+is nothing to turn on in PhoneBox.
+
+1. Download the latest release from
+   [LibreHardwareMonitor's releases](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases), unzip it
+   to a folder of its own and start `LibreHardwareMonitor.exe` **as administrator** (CPU temperatures and several GPU
+   sensors need it).
+2. In its menu choose **Options › Remote Web Server › Run**. The port stays **8085** (PhoneBox only looks there).
+3. Check it in a browser on the PC: <http://127.0.0.1:8085/data.json> should show a long JSON text. Within a few
+   seconds the CPU temperature and the extra GPU values appear on the phone.
+4. To keep it running: **Options › Start Minimized**, **Minimize To Tray** and **Run On Windows Startup**.
+
+The web server answers on every network the PC is on. If Windows Firewall asks, PhoneBox only needs it on this
+computer, so you can leave the network access unchecked. Menu names are those of recent LibreHardwareMonitor versions
+and may differ slightly in older ones.
+
 ## Wi-Fi & Tailscale
 
 Turn on **Settings › General › Wi-Fi & Tailscale** and restart the agent when asked. Then pair the phone in one

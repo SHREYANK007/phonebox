@@ -97,6 +97,7 @@ jobs:
         run: |
           python3 tools/test-unix-installer.py --bash /bin/bash
           python3 tools/test-unix-autostart.py /bin/bash
+          python3 tools/test-unix-uninstall.py
       # the same build as the release (release.yml), so a pull request runs what ships
       - name: Publish agent (self-contained, single file)
         run: dotnet publish agent/PhoneBox.Agent -c Release -f ${{ matrix.tfm }} -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -o out --nologo

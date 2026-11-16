@@ -138,6 +138,8 @@ public class LanTests
     [InlineData("/api/run/terminal", true)]
     [InlineData("/api/apps", true)]
     [InlineData("/api/apps/open", true)]
+    [InlineData("/api/feeds", true)]
+    [InlineData("/api/feeds/open", true)]
     [InlineData("/api/push/temperature", true)]
     [InlineData("/api/settings", false)]
     [InlineData("/api/pair", false)]
@@ -230,6 +232,47 @@ public class ConfigConcurrencyTests
             Assert.Equal(0.02, s.Get().Night.Brightness);
         }
         finally { File.Delete(path); File.Delete(path + ".bak"); }
+    }
+
+    [Fact]
+    public void GeneratedKeysPersistForANewConfigWithoutReplacingUnreadableFiles()
+    {
+        var dir = Directory.CreateTempSubdirectory("phonebox-config-");
+        try
+        {
+            var path = Path.Combine(dir.FullName, "config.json");
+            var store = new ConfigStore(path);
+            var generated = store.Get().Lan;
+            store.PersistGenerated();
+            Assert.True(File.Exists(path));
+            var restarted = new ConfigStore(path).Get().Lan;
+            Assert.Equal(generated.Token, restarted.Token);
+            Assert.Equal(generated.WebhookToken, restarted.WebhookToken);
+
+            const string invalid = "{ incomplete";
+            File.WriteAllText(path, invalid);
+            new ConfigStore(path).PersistGenerated();
+            Assert.Equal(invalid, File.ReadAllText(path));
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public void DeletingSettingsInvalidatesTheVersionHeldByOpenTabs()
+    {
+        var (store, path) = NewStore();
+        try
+        {
+            var version = store.Version;
+            var stale = With(store, c => c.Night.Start = "01:11");
+            File.Delete(path);
+
+            Assert.Equal(ConfigStore.Conflict, store.Save(stale, version));
+            Assert.False(File.Exists(path));
+            Assert.Null(store.Save(stale, store.Version));
+            Assert.True(File.Exists(path));
+        }
+        finally { File.Delete(path); }
     }
 
     [Fact]

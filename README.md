@@ -38,7 +38,7 @@ Windows, Linux and macOS. No root, PhoneBox account or cloud service required.</
 <sub>Example layouts with demo data.</sub></p>
 
 PhoneBox pairs a full-screen **Android app** with a small **desktop agent**. Build your panel in a browser-based
-visual editor: **117 widgets**, **30 templates**, multiple pages and a live preview. Connect several phones with
+visual editor: **118 widgets**, **30 templates**, multiple pages and a live preview. Connect several phones with
 their own layouts, or switch one phone between paired computers.
 
 ## What you can do
@@ -141,7 +141,7 @@ Change fonts, size, spacing, corners and surfaces globally or for one page or wi
 |---|---|---|---|
 | Release builds | x64 | x64 / ARM64, glibc | Apple silicon / Intel |
 | CPU, RAM, disks, network, processes | ✓ | ✓ | ✓ |
-| GPU data | Windows counters; NVIDIA via `nvidia-smi`; extra sensors via LibreHardwareMonitor | NVIDIA / AMD; Intel clock | Apple silicon, when exposed by macOS |
+| GPU data | Windows counters; NVIDIA via `nvidia-smi`; extra sensors via [LibreHardwareMonitor](docs/SETUP.md#librehardwaremonitor-on-windows) | NVIDIA / AMD; Intel clock | Apple silicon, when exposed by macOS |
 | Media | System media sessions | `playerctl` | `nowplaying-cli`; Spotify / Music fallback |
 | Volume | Native | `wpctl` / `pactl` | System output; availability varies by device |
 | Agent interface | Tray icon + browser settings | Browser settings | Browser settings |
@@ -181,7 +181,8 @@ Read the [security details](docs/GUIDE.md#security--privacy). To report a vulner
 ## Development
 
 The agent uses **.NET 10**; the Android app uses **Kotlin and a WebView** with plain JavaScript widgets.
-For Android builds, install **JDK 17** and **Android SDK Platform 35**.
+For Android builds, install **JDK 17** and **Android SDK Platform 35** (the SDK the app is built with; the app itself
+runs on Android 7.0, API 24, and later).
 Preview the panel and editor from source with Python 3, using simulated data:
 
 ```sh

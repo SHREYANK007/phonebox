@@ -40,4 +40,45 @@ public sealed class ToolProcessTests
         }
         finally { File.Delete(marker); }
     }
+    [Fact]
+    public async Task CancellingGitHubRefreshReapsTheCli()
+    {
+        var marker = Path.Combine(Path.GetTempPath(), "pb-gh-process-" + Guid.NewGuid());
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        var start = Shell(
+            $"[IO.File]::WriteAllText('{marker}', [string]$PID); Start-Sleep -Seconds 60",
+            $"echo $$ > '{marker}'; exec sleep 60");
+        start.UseShellExecute = false;
+        start.RedirectStandardOutput = start.RedirectStandardError = true;
+        int pid = 0;
+        try
+        {
+            var refresh = GitHubMonitor.RunGh(start, cancellation.Token);
+            while (pid == 0)
+            {
+                if (File.Exists(marker))
+                    int.TryParse((await File.ReadAllTextAsync(marker, cancellation.Token)).Trim(), out pid);
+                if (pid == 0) await Task.Delay(20, cancellation.Token);
+            }
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
+            Assert.False(IsAlive(pid), "GitHub CLI survived cancellation");
+        }
+        finally
+        {
+            if (pid > 0 && IsAlive(pid))
+            {
+                try { using var child = Process.GetProcessById(pid); child.Kill(entireProcessTree: true); }
+                catch (ArgumentException) { }
+            }
+            File.Delete(marker);
+        }
+
+        static bool IsAlive(int id)
+        {
+            try { using var process = Process.GetProcessById(id); return !process.HasExited; }
+            catch (ArgumentException) { return false; }
+        }
+    }
+
 }

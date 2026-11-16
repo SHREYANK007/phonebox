@@ -101,6 +101,9 @@
   const widgets = (c) => (c.pages || []).flatMap((p) => p.widgets || []).flatMap((w) => [w, ...(w.type === 'stack' ? (w.options?.widgets || []).filter((x) => x.enabled !== false) : [])]);
   const allows = (c, test) => widgets(c).some((w) => test(w.type) && w.options?.control === true);
   const isObs = (type) => type === 'obs' || type.startsWith('obs-');
+  // like AgentConfig.Widgets(enabledPagesOnly: true): what may control the computer comes from enabled pages only
+  const shownWidgets = (c) => widgets({ ...c, pages: (c.pages || []).filter((p) => p.enabled !== false) });
+  const feedsCanOpen = (c) => shownWidgets(c).some((w) => w.type === 'feeds' && w.options?.open === true);
 
   // What the agent sends to a phone (AgentConfig.ToPublic): no commands, keys, tokens or what a rule matches on.
   function publicConfig(c) {
@@ -135,6 +138,8 @@
   };
   let pushVersion = 1;
   let rulesPaused = 0;
+  // the phone reports its battery through /api/phone/battery; /api/charge serves the last report
+  let phoneBattery = { level: 72, plugged: true, temp: 29, at: now() - 20e3, source: 'usb', usb: 'configured' };
   let approvals = [];
   const SAMPLE_PROMPTS = [
     { tool: 'Run a command', detail: 'git push origin main --force-with-lease', description: 'Push the rebased branch', project: 'api-gateway' },
@@ -321,6 +326,15 @@
     Array.from({ length: 13 }, (_, i) => `<line x1="150" y1="170" x2="${-300 + i * 75}" y2="300"/>`).join('') + '</g></svg>');
 
   // ---- router
+  // headlines as the agent sends them: no links, the phone opens one by its id
+  const DEMO_FEEDS = () => [
+    ['f1', 'A tiny e-ink weather station that runs for a year on one charge', 'Hackaday', 18],
+    ['f2', 'Rust 2.0 roadmap: what changes for async code', 'Tech news', 47],
+    ['f3', 'Why old phones make great desk dashboards', 'Blog', 95],
+    ['f4', 'The James Webb telescope finds water in a young planetary system', 'Science', 160],
+    ['f5', 'Ten keyboard shortcuts that save an hour a week', 'Tech news', 240],
+    ['f6', 'Inside the factory that still makes film cameras', 'Hackaday', 420],
+  ].map(([id, title, source, min]) => ({ id, title, source, published: now() - min * 60_000, openable: true }));
   const json = (o, status = 200, headers = {}) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
   const parse = (body) => { if (body == null || body === '') return null; try { return JSON.parse(body); } catch (_) { return String(body); } };
 
@@ -537,6 +551,11 @@
       { name: 'MX Keys', level: 18, kind: 'keyboard', charging: null },
       { name: 'Xbox Wireless Controller', level: 40, kind: 'controller', charging: null },
     ] });
+    if (path === '/api/feeds') { const c = await config(); return json({ items: DEMO_FEEDS(), updated: now(), errors: [], canOpen: feedsCanOpen(c) }); }
+    if (path === '/api/feeds/open' && method === 'POST') {
+      if (!feedsCanOpen(await config())) return json({ error: 'Opening articles is off: turn on "Open articles on the PC" in the News feeds widget\'s settings' }, 400);
+      return DEMO_FEEDS().some((i) => i.id === q.get('id') && i.openable) ? json({ ok: true }) : json({ error: 'That headline is no longer in the list' }, 400);
+    }
     if (path === '/api/apps') { const c = await config(); return json({ supported: true, canOpen: widgets(c).some((w) => w.type === 'apps'), apps: DEMO_APPS }); }
     if (path === '/api/apps/open' && method === 'POST') {
       if (!widgets(await config()).some((w) => w.type === 'apps')) return json({ error: 'Add an All apps widget to a page to open apps from the phone' }, 400);
@@ -596,7 +615,18 @@
       rulesPaused = m > 0 ? now() + m * 60e3 : 0;
       return json({ pausedUntil: rulesPaused || null });
     }
-    if (path === '/api/charge') return json({ phone: { level: 72, plugged: true, temp: 29, at: now() - 20e3, source: 'usb', usb: 'configured' }, power: null, switchedAt: null, error: null });
+    if (path === '/api/phone/battery' && method === 'POST') {
+      phoneBattery = {
+        level: Math.max(0, Math.min(100, +q.get('level') || 0)),
+        plugged: q.get('plugged') === 'true',
+        temp: q.has('temp') ? +q.get('temp') : null,
+        at: now(),
+        source: (q.get('source') || '').trim().toLowerCase() || null,
+        usb: (q.get('usb') || '').trim().toLowerCase() || null,
+      };
+      return json({ ok: true });
+    }
+    if (path === '/api/charge') return json({ phone: phoneBattery, power: null, switchedAt: null, error: null });
     if (path === '/api/notify' && method === 'POST') {
       const d = parse(body), payload = typeof d === 'object' && d && !Array.isArray(d) ? d : { text: d == null ? '' : String(d) };
       if (!('text' in payload) && !('title' in payload)) return json({ error: 'give a text or a title' }, 400);

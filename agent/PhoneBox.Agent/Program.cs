@@ -23,7 +23,9 @@ if (!firstInstance)
 }
 
 if (!args.Contains("--config")) AppPaths.EnsureConfig();
-var configPath = args.SkipWhile(a => a != "--config").Skip(1).FirstOrDefault() ?? AppPaths.ConfigPath;
+// absolute from here on: a bare file name ("--config profile.json") has no folder, and the files kept next to the
+// config (the Spotify login, backups) need one
+var configPath = Path.GetFullPath(args.SkipWhile(a => a != "--config").Skip(1).FirstOrDefault() ?? AppPaths.ConfigPath);
 AppPaths.RestrictConfig(configPath);
 var configStore = new ConfigStore(configPath);
 configStore.PersistGenerated(); // keep the Wi-Fi token stable across restarts
@@ -64,6 +66,7 @@ AddMonitor<MediaMonitor>(builder.Services);
 AddMonitor<QuotaMonitor>(builder.Services);
 AddMonitor<ProcessMonitor>(builder.Services);
 AddMonitor<SessionMonitor>(builder.Services);
+AddMonitor<FeedMonitor>(builder.Services);
 AddMonitor<GitHubMonitor>(builder.Services);
 AddMonitor<PingMonitor>(builder.Services);
 AddMonitor<AdbReverse>(builder.Services);
@@ -444,6 +447,15 @@ object State(IServiceProvider sp, long? ev)
 
 // Upcoming calendar events (Agenda widget); the feed URLs stay here.
 app.MapGet("/api/calendar", (CalendarMonitor cal) => Results.Json(cal.Snapshot()));
+
+// Headlines for the Feeds widget; the feed and article addresses stay here, the phone opens an article by its id.
+app.MapGet("/api/feeds", (FeedMonitor feeds) =>
+{
+    var s = feeds.Snapshot();
+    return Results.Json(new { s.Items, s.Updated, s.Errors, canOpen = feeds.OpenAllowed() });
+});
+app.MapPost("/api/feeds/open", (string? id, FeedMonitor feeds) =>
+    feeds.Open(id) is { } error ? Results.BadRequest(new { error }) : Results.Ok(new { ok = true }));
 
 // Docker / Podman containers (Docker widget); start / stop / restart only if a widget allows it.
 app.MapGet("/api/docker", async (DockerMonitor docker, CancellationToken ct) =>

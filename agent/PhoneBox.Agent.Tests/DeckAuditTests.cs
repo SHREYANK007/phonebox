@@ -75,7 +75,7 @@ public sealed class DeckAuditTests
             File.WriteAllText(path, JsonSerializer.Serialize(new { shortcuts = new[] { new { id = "lamp", label = "Lamp", toggle = true, stateKey = "lamp",
                 cmd = Path.Combine(dir, "lamp-on-missing.exe"), offCmd = Path.Combine(dir, "lamp-off-missing.exe") } } }));
             var config = new ConfigStore(path);
-            var push = new PushStore(NullLogger<PushStore>.Instance, Path.Combine(dir, "data.json"));
+            using var push = new PushStore(NullLogger<PushStore>.Instance, Path.Combine(dir, "data.json"));
             Assert.Null(push.Set("lamp", JsonSerializer.SerializeToElement(true), null));
 
             // Reference behaviour (/api/run): the pushed state is on, so the off command is the one attempted.

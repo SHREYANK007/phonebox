@@ -13,10 +13,23 @@ public sealed class AuditRegressionTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "phonebox-tests-" + Guid.NewGuid().ToString("N"));
 
-    public AuditRegressionTests() => Directory.CreateDirectory(_dir);
-    public void Dispose() { try { Directory.Delete(_dir, true); } catch { } }
+    private readonly List<PushStore> _stores = [];
 
-    private PushStore Push() => new(NullLogger<PushStore>.Instance, Path.Combine(_dir, "data.json"));
+    public AuditRegressionTests() => Directory.CreateDirectory(_dir);
+
+    public void Dispose()
+    {
+        // a store saves 2 s after its last change; disposing it saves now, so the folder isn't recreated after it's gone
+        foreach (var s in _stores) s.Dispose();
+        try { Directory.Delete(_dir, true); } catch { }
+    }
+
+    private PushStore Push()
+    {
+        var s = new PushStore(NullLogger<PushStore>.Instance, Path.Combine(_dir, "data.json"));
+        _stores.Add(s);
+        return s;
+    }
     private static readonly JsonElement Open = JsonSerializer.SerializeToElement("open");
 
     [Fact]

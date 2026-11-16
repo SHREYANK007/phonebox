@@ -360,11 +360,16 @@ export const WX = {
 /** The icon name for a weather code (night variants where there are any). */
 export const wxIcon = (code, day = 1) => { const x = WX[code] || ['—', 'thermometer']; return day === 0 && x[2] ? x[2] : x[1]; };
 
+let weatherRetry = 0;
+let weatherFor = ''; // the location the forecast in D.weather belongs to
+const weatherKey = () => { const { lat, lon } = cfg.weather || DEFAULT_CFG.weather; return `v3:${lat},${lon}`; };
 export async function loadWeather(force = false) {
   const { lat, lon } = cfg.weather || DEFAULT_CFG.weather;
-  const key = `v3:${lat},${lon}`;
+  const key = weatherKey();
   const cached = store.get('wx', null);
-  if (cached && cached.key === key && !D.weather) { D.weather = cached.data; emit('weather'); }
+  // a new place starts from its own cache or from "Loading…", never from the previous place's forecast
+  if (D.weather && weatherFor !== key) { D.weather = null; emit('weather'); }
+  if (cached && cached.key === key && !D.weather) { D.weather = cached.data; weatherFor = key; emit('weather'); }
   if (!force && cached && cached.key === key && Date.now() - cached.at < 14 * 60_000) return;
   // only while a page shows the weather (PRIVACY.md): no widget, no request with the location
   if (!anyNeeds('weather')) return;
@@ -376,11 +381,21 @@ export async function loadWeather(force = false) {
       '&timezone=auto&forecast_days=7';
     const ctl = new AbortController();
     setTimeout(() => ctl.abort(), 8000);
-    const data = await (await safeFetch(url, { signal: ctl.signal })).json();
+    const r = await safeFetch(url, { signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    // an error answer (from Open-Meteo or the agent's fallback) must not be kept as the forecast for 14 minutes
+    if (!data || !data.current) throw new Error('no forecast');
+    if (weatherKey() !== key) return; // the place changed while this was on its way
     store.set('wx', { key, at: Date.now(), data });
     D.weather = data;
+    weatherFor = key;
     emit('weather');
-  } catch (_) { if (!D.weather) emit('weather'); }
+  } catch (_) {
+    // false, not null: the widgets say "Weather unavailable" instead of "Loading…" for good, and try again soon
+    if (!D.weather) { D.weather = false; emit('weather'); }
+    if (!weatherRetry) weatherRetry = setTimeout(() => { weatherRetry = 0; loadWeather(); }, 2 * 60_000);
+  }
 }
 
 export function wxLines() {
@@ -403,7 +418,14 @@ export function wxBlock() {
     h('div', 'wx-meta', h('span', 'wx-desc', t('w.loading')), h('span', 'wx-range muted')));
   e.update = () => {
     const l = wxLines();
-    if (!l) { e.querySelector('.wx-desc').textContent = D.weather === null ? t('w.loading') : t('w.weatherUnavailable'); return; }
+    if (!l) {
+      // no forecast: clear the last one too, so an old temperature never sits next to the new message
+      e.querySelector('.wx-icon').textContent = '·';
+      e.querySelector('.wx-temp').textContent = '--°';
+      e.querySelector('.wx-range').textContent = '';
+      e.querySelector('.wx-desc').textContent = D.weather === null ? t('w.loading') : t('w.weatherUnavailable');
+      return;
+    }
     e.querySelector('.wx-icon').replaceChildren(icon(l.icon) || '');
     e.querySelector('.wx-temp').textContent = l.temp;
     e.querySelector('.wx-desc').textContent = l.desc;
@@ -464,8 +486,11 @@ export function keyButton(s) {
 
 // ---------------------------------------------------------------- media (shared state, any number of widgets)
 export let media = null;          // last media state + the time it was received
-export let volDragging = false;
-export const setVolDragging = (v) => { volDragging = v; };
+export let volDragging = null;
+export function setVolDragging(control, dragging) {
+  if (dragging) volDragging = control;
+  else if (volDragging === control) volDragging = null;
+}
 export const setMediaState = (m) => {
   if (D.state) D.state.media = m || null;
   media = m ? { ...m, at: performance.now() } : null;
@@ -913,10 +938,10 @@ export function handleEvent(e) {
 }
 
 // the page overview draws each widget as its icon (names from icons.js)
-export const WIDGET_ICONS = { discord: 'chat-circle', rules: 'lightning', chargecare: 'battery-charging', nextup: 'skip-forward', moon: 'moon', wordclock: 'text-aa', clock: 'clock', weather: 'cloud-sun', forecast: 'cloud-rain', media: 'music-notes', stat: 'chart-line-up', gauge: 'gauge', chart: 'chart-bar', meters: 'hard-drives',
+export const WIDGET_ICONS = { discord: 'chat-circle', rules: 'lightning', chargecare: 'battery-charging', nextup: 'skip-forward', moon: 'moon', wordclock: 'text-aa', clock: 'clock', weather: 'cloud-sun', forecast: 'cloud-rain', media: 'music-notes', stat: 'chart-line-up', gauge: 'gauge', chart: 'chart-bar', meters: 'hard-drives', gpu: 'graphics-card', quotas: 'asterisk', sessions: 'robot',
   github: 'github-logo', processes: 'cpu', shortcuts: 'squares-four', button: 'cursor-click', worldclock: 'globe-hemisphere-east', calendar: 'calendar-blank', pomodoro: 'timer', countdown: 'hourglass-medium', note: 'note-pencil', command: 'terminal-window',
   push: 'broadcast', inbox: 'tray', label: 'text-aa', analog: 'clock', progress: 'calendar-dots', stopwatch: 'timer', timer: 'alarm', counter: 'hash', breathe: 'wind', quote: 'quotes',
-  checklist: 'list-checks', battery: 'battery-full', topprocs: 'fire', quotaring: 'target', volume: 'speaker-high', sun: 'sun-horizon', air: 'leaf', hackernews: 'newspaper', exchange: 'swap', crypto: 'coins', image: 'image', pcswitch: 'monitor' };
+  checklist: 'list-checks', battery: 'battery-full', topprocs: 'fire', quotaring: 'target', volume: 'speaker-high', sun: 'sun-horizon', air: 'leaf', hackernews: 'newspaper', feeds: 'rss', exchange: 'swap', crypto: 'coins', image: 'image', pcswitch: 'monitor' };
 
 // ================================================================= pages
 export const pager = $('pager');

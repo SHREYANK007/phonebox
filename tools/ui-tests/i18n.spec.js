@@ -59,3 +59,13 @@ test('the breathe widget greets in the panel language before the first tap', asy
   await show(page, [{ id: 'br', type: 'breathe', x: 0, y: 0, w: 4, h: 2, options: {} }]);
   await expect(page.locator('.br-w')).toHaveText('Tippen zum Starten');
 });
+
+test('every language covers every key English defines', async ({ page }) => {
+  await page.goto('/panel/');
+  const gaps = await page.evaluate(() => {
+    const S = window.PhoneBoxI18n.STRINGS;
+    return Object.keys(S).flatMap((lang) =>
+      lang === 'en' ? [] : Object.keys(S.en).filter((k) => !(k in S[lang])).map((k) => `${lang}:${k}`));
+  });
+  expect(gaps).toEqual([]);
+});

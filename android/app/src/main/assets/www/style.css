@@ -977,6 +977,13 @@ body.offline .offline-msg { display: flex; }
 .hn-b { min-width: 0; flex: 1; }
 .hn-t { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hn-m { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fd-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.fd-i { height: 30px; min-width: 0; border-left: 2px solid transparent; padding-left: 6px; }
+.fd-i.link { border-left-color: var(--c); cursor: pointer; }
+.fd-i.link:active { background: rgba(255, 255, 255, .06); }
+.fd-t { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fd-m { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fd-warn { color: var(--warn); }
 .w-exchange, .w-crypto { padding: 9px 12px; display: flex; flex-direction: column; gap: 4px; --c: var(--ok); }
 .w-crypto { --c: #f7931a; }
 .fx-list { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; gap: 2px; }
