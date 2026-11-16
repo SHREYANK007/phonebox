@@ -1306,7 +1306,9 @@ export function renderRulesBtn() {
   const paused = rulesPaused && rulesPaused > Date.now();
   b.hidden = PREVIEW || !online;
   b.classList.toggle('on', !!paused);
-  b.textContent = paused ? t('panel.rulesPausedUntil', { time: fmtHM(new Date(rulesPaused)) }) : t('panel.pauseRules1h');
+  // the translations start with a pause symbol; the panel draws the icon instead
+  const label = paused ? t('panel.rulesPausedUntil', { time: fmtHM(new Date(rulesPaused)) }) : t('panel.pauseRules1h');
+  b.replaceChildren(icon('pause'), ' ', label.replace(/^\u23F8\uFE0F?\s*/, ''));
 }
 
 export let titleTimer = 0;

@@ -18,6 +18,7 @@
     [Phosphor](https://phosphoricons.com) (MIT). A shortcut's or page's icon can still be an emoji: common ones are
     drawn as the matching icon, and an icon's name (`terminal-window`, `globe`, `lock`…) works too. Pomodoro rounds
     done today show as dots.
+- The News feeds card has the same padding as the Hacker News card; its title sat in the corner.
 
 ## 0.9.14 — 2026-11-16
 

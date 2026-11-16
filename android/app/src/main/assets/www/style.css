@@ -970,7 +970,7 @@ body.offline .offline-msg { display: flex; }
 @container (max-height: 100px) { .w-air .aq-chips { display: none; } }
 
 /* ---------- hacker news, exchange rates, crypto ---------- */
-.w-hackernews { padding: 9px 12px; display: flex; flex-direction: column; gap: 4px; }
+.w-hackernews, .w-feeds { padding: 9px 12px; display: flex; flex-direction: column; gap: 4px; }
 .hn-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
 .hn-i { display: flex; gap: 8px; align-items: flex-start; height: 30px; }
 .hn-r { width: 18px; text-align: right; font-size: 11px; color: #ff6600; font-weight: 700; padding-top: 1px; flex: 0 0 18px; }
